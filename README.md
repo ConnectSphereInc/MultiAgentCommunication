@@ -22,5 +22,5 @@ OPENAI_API_KEY=<your-api-key>
 ## Usage
 
 ```bash
-julia --project=. experiment/main.jl
+julia --project=. experiments/main.jl
 ```

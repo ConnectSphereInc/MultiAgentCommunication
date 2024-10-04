@@ -155,13 +155,19 @@ function setup_renderer(domain, initial_state, agents, gridworld_only)
         resolution = (600,1100),
         has_agent = false,
         obj_renderers = Dict{Symbol, Function}(
-            key => (d, s, o) -> PDDLViz.MultiGraphic(
-                (key == :agent ? PDDLViz.RobotGraphic : PDDLViz.GemGraphic)(color = (key == :agent ? :slategray : key)),
-                PDDLViz.TextGraphic(
-                    string(o.name)[end:end], 0.3, 0.2, 0.5,
-                    color = :black, font = :bold
-                )
-            )
+            key => (d, s, o) -> begin
+                if key == :agent
+                    PDDLViz.MultiGraphic(
+                        PDDLViz.RobotGraphic(color = :slategray),
+                        PDDLViz.TextGraphic(
+                            string(o.name)[end:end], 0.3, 0.2, 0.5,
+                            color = :black, font = :bold
+                        )
+                    )
+                else
+                    PDDLViz.GemGraphic(color = key)
+                end
+            end
             for key in [:agent, :red, :yellow, :blue, :green]
         ),
         show_inventory = !gridworld_only,
