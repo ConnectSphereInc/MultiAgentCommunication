@@ -14,7 +14,6 @@ export run_simulation
 
 function run_simulation(
     problem_name::String,
-    share_beliefs::Bool,
     ess_thresh::Float64,
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
@@ -55,15 +54,9 @@ function run_simulation(
     state = initial_state
 
     # Initialize beliefs and heuristics
-    if share_beliefs
-        pf_states = nothing
-        gem_utilities = Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green])
-        heuristics = [VisionGemHeuristic(agent, gem_utilities) for agent in agents]
-    else
-        pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
-        gem_utilities = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
-        heuristics = [VisionGemHeuristic(agent, gem_utilities[agent]) for agent in agents]
-    end
+    pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
+    gem_utilities = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
+    heuristics = [VisionGemHeuristic(agent, gem_utilities[agent]) for agent in agents]
 
     # Initialize planners
     planners = [RTHS(heuristic, n_iters=0, max_nodes=5) for heuristic in heuristics]
@@ -72,7 +65,7 @@ function run_simulation(
         for (i, agent) in enumerate(agents)
             goals = PDDL.Term[]
             rewards = Float64[]        
-            current_beliefs = share_beliefs ? gem_utilities : gem_utilities[agent]
+            current_beliefs = gem_utilities[agent]
             for gem in remaining_items
                 gem_obj = PDDL.Const(gem)
                 color = Symbol(split(string(gem), "_")[1])
@@ -112,30 +105,22 @@ function run_simulation(
                 println("       $agent communicated: $utterance.")
                 
                 alt_observation = Gen.choicemap()
-                gem_count = share_beliefs ? total_gems_picked_up : num_gems_picked_up[agent]
+                gem_count = num_gems_picked_up[agent]
                 alt_observation[gem_count => :utterance => :output] = utterance
                 alt_observation[gem_count => :gem_pickup] = true
                 alt_observation[gem_count => :gem] = gem
 
                 # Update beliefs
-                if share_beliefs
-                    pf_states, current_pf_state = update_shared_beliefs(pf_states, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh, total_gems_picked_up)
-                else
-                    pf_states[agent], current_pf_state = update_individual_beliefs(pf_states[agent], gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
-                end
+                pf_states[agent], current_pf_state = update_individual_beliefs(pf_states[agent], gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
 
                 # Calculate and update gem utilities
                 top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
                 gem_certainty = quantify_gem_certainty(top_rewards)
                 utilities, certainties = calculate_gem_utility(gem_certainty)
-                
-                if share_beliefs
-                    gem_utilities = utilities
-                else
-                    gem_utilities[agent] = utilities
-                end
-                
-                print_estimated_rewards(share_beliefs, agents, gem_utilities, certainties)
+
+                gem_utilities[agent] = utilities
+
+                print_estimated_rewards(agents, gem_utilities, certainties)
             end
 
             push!(actions, action)
@@ -213,17 +198,10 @@ function update_individual_beliefs(pf_state, gem_count, possible_gems, possible_
     return pf_state, pf_state
 end
 
-function print_estimated_rewards(share_beliefs, agents, gem_utilities, certainties)
-    if !share_beliefs
-        for agent in agents
-            println("       $agent's Estimated Rewards:")
-            for (gem, value) in gem_utilities[agent]
-                println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
-            end
-        end
-    else
-        println("       Estimated Rewards:")
-        for (gem, value) in gem_utilities
+function print_estimated_rewards(agents, gem_utilities, certainties)
+    for agent in agents
+        println("       $agent's Estimated Rewards:")
+        for (gem, value) in gem_utilities[agent]
             println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
         end
     end
