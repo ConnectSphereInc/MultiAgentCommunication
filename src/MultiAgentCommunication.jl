@@ -34,7 +34,7 @@ function run_simulation(
     agents = Symbol[obj.name for obj in PDDL.get_objects(domain, initial_state, :agent)]
     
     # Renderer setup
-    renderer = setup_renderer(domain, initial_state, agents, gridworld_only)
+    renderer = setup_renderer(agents, gridworld_only)
     canvas = renderer(domain, initial_state)
 
     # Output setup
@@ -53,25 +53,27 @@ function run_simulation(
     total_gems_picked_up = 0
     state = initial_state
 
-    # Initialize beliefs and heuristics
+    # Initialize beliefs and heuristics optimistically
     pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
-    gem_utilities = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
-    heuristics = [VisionGemHeuristic(agent, gem_utilities[agent]) for agent in agents]
+    beliefs = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
+    heuristics = [VisionGemHeuristic(agent, beliefs[agent]) for agent in agents]
 
     # Initialize planners
     planners = [RTHS(heuristic, n_iters=0, max_nodes=5) for heuristic in heuristics]
     
+    # Main loop
     while !isempty(remaining_items) && t <= T
         for (i, agent) in enumerate(agents)
             goals = PDDL.Term[]
             rewards = Float64[]        
-            current_beliefs = gem_utilities[agent]
+            current_beliefs = beliefs[agent]
             for gem in remaining_items
                 gem_obj = PDDL.Const(gem)
                 color = Symbol(split(string(gem), "_")[1])
                 reward = current_beliefs[color]
                 heuristics[i].rewards[color] = reward
 
+                # If the agent believes any remaining gems have postive reward, set the goal to get that gem
                 if reward >= 0
                     push!(goals, PDDL.pddl"(has $agent $gem_obj)")
                     push!(rewards, reward)
@@ -80,9 +82,10 @@ function run_simulation(
 
             spec = MultiGoalReward(goals, rewards, 0.95)
             sol = planners[i](domain, state, spec)
-            action = best_action(sol.value_policy, state, agent)
+            action = boltzmann_action(sol.value_policy, state, agent, 0.)
             state = transition(domain, state, action; check=true)
 
+            # If the agent picks up a gem
             if action.name == :pickup
                 item = action.args[2].name
                 println("Step $t:")
@@ -118,9 +121,9 @@ function run_simulation(
                 gem_certainty = quantify_gem_certainty(top_rewards)
                 utilities, certainties = calculate_gem_utility(gem_certainty)
 
-                gem_utilities[agent] = utilities
+                beliefs[agent] = utilities
 
-                print_estimated_rewards(agents, gem_utilities, certainties)
+                print_estimated_rewards(agents, beliefs, certainties)
             end
 
             push!(actions, action)
@@ -133,41 +136,6 @@ function run_simulation(
     save(joinpath(output_folder, "plan.mp4"), anim)
 
     return combined_score
-end
-
-function setup_renderer(domain, initial_state, agents, gridworld_only)
-    return PDDLViz.GridworldRenderer(
-        resolution = (600,1100),
-        has_agent = false,
-        obj_renderers = Dict{Symbol, Function}(
-            key => (d, s, o) -> begin
-                if key == :agent
-                    PDDLViz.MultiGraphic(
-                        PDDLViz.RobotGraphic(color = :slategray),
-                        PDDLViz.TextGraphic(
-                            string(o.name)[end:end], 0.3, 0.2, 0.5,
-                            color = :black, font = :bold
-                        )
-                    )
-                else
-                    PDDLViz.GemGraphic(color = key)
-                end
-            end
-            for key in [:agent, :red, :yellow, :blue, :green]
-        ),
-        show_inventory = !gridworld_only,
-        inventory_fns = [
-            (d, s, o) -> s[PDDL.Compound(:has, [PDDL.Const(agent), o])] for agent in agents
-        ],
-        inventory_types = [:item for agent in agents],
-        inventory_labels = ["$agent Inventory" for agent in agents],
-        show_vision = !gridworld_only,
-        vision_fns = [
-            (d, s, o) -> s[PDDL.Compound(:visible, [PDDL.Const(agent), o])] for agent in agents
-        ],
-        vision_types = [:item for agent in agents],
-        vision_labels = ["$agent Vision" for agent in agents],
-    )
 end
 
 function update_beliefs(pf_state, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
@@ -184,13 +152,4 @@ function update_beliefs(pf_state, gem_count, possible_gems, possible_rewards, al
     return pf_state, pf_state
 end
 
-function print_estimated_rewards(agents, gem_utilities, certainties)
-    for agent in agents
-        println("       $agent's Estimated Rewards:")
-        for (gem, value) in gem_utilities[agent]
-            println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
-        end
-    end
-end
-    
 end # module

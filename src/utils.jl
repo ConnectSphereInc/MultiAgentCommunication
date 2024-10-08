@@ -138,6 +138,78 @@ function best_action(sol::TabularVPolicy, state::State, agent::Symbol)
     return isempty(best_acts) ? missing : rand(best_acts)
 end
 
+function boltzmann_action(sol::TabularVPolicy, state::State, agent::Symbol, temperature::Float64)
+    actions = []
+    values = []
+    
+    for act in available(sol.domain, state)
+        if Symbol(act.args[1]) == agent
+            push!(actions, act)
+            push!(values, get_value(sol, state, act))
+        end
+    end
+    
+    if isempty(actions)
+        return missing
+    end
+    
+    if temperature == 0
+        # Deterministic case: choose the action with the highest value
+        max_value = maximum(values)
+        best_actions = actions[values .== max_value]
+        return rand(best_actions)
+    else
+        # Stochastic case: use Boltzmann distribution
+        # Apply Gumbel-max trick for numerical stability
+        scores = values ./ temperature .+ rand(Gumbel(), length(values))
+        return actions[argmax(scores)]
+    end
+end
+
 function gem_to_color(gem::Symbol)
     return Symbol(split(string(gem), "_")[1])
+end
+
+function setup_renderer(agents, gridworld_only)
+    return PDDLViz.GridworldRenderer(
+        resolution = (600,1100),
+        has_agent = false,
+        obj_renderers = Dict{Symbol, Function}(
+            key => (d, s, o) -> begin
+                if key == :agent
+                    PDDLViz.MultiGraphic(
+                        PDDLViz.RobotGraphic(color = :slategray),
+                        PDDLViz.TextGraphic(
+                            string(o.name)[end:end], 0.3, 0.2, 0.5,
+                            color = :black, font = :bold
+                        )
+                    )
+                else
+                    PDDLViz.GemGraphic(color = key)
+                end
+            end
+            for key in [:agent, :red, :yellow, :blue, :green]
+        ),
+        show_inventory = !gridworld_only,
+        inventory_fns = [
+            (d, s, o) -> s[PDDL.Compound(:has, [PDDL.Const(agent), o])] for agent in agents
+        ],
+        inventory_types = [:item for agent in agents],
+        inventory_labels = ["$agent Inventory" for agent in agents],
+        show_vision = !gridworld_only,
+        vision_fns = [
+            (d, s, o) -> s[PDDL.Compound(:visible, [PDDL.Const(agent), o])] for agent in agents
+        ],
+        vision_types = [:item for agent in agents],
+        vision_labels = ["$agent Vision" for agent in agents],
+    )
+end
+
+function print_estimated_rewards(agents, gem_utilities, certainties)
+    for agent in agents
+        println("       $agent's Estimated Rewards:")
+        for (gem, value) in gem_utilities[agent]
+            println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
+        end
+    end
 end
