@@ -21,7 +21,6 @@ function main()
 
     final_score = run_simulation(
         problem_name,
-        share_beliefs,
         ess_thresh,
         num_particles,
         ground_truth_rewards,

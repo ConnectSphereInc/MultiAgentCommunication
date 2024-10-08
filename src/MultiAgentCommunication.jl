@@ -111,7 +111,7 @@ function run_simulation(
                 alt_observation[gem_count => :gem] = gem
 
                 # Update beliefs
-                pf_states[agent], current_pf_state = update_individual_beliefs(pf_states[agent], gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
+                pf_states[agent], current_pf_state = update_beliefs(pf_states[agent], gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
 
                 # Calculate and update gem utilities
                 top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
@@ -170,21 +170,7 @@ function setup_renderer(domain, initial_state, agents, gridworld_only)
     )
 end
 
-function update_shared_beliefs(pf_states, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh, total_gems_picked_up)
-    if pf_states === nothing
-        pf_states = pf_initialize(utterance_model, (gem_count, possible_gems, possible_rewards), alt_observation, num_particles)
-    else
-        if effective_sample_size(pf_states) < ess_thresh * num_particles
-            pf_resample!(pf_states, :stratified)
-            rejuv_sel = select()
-            pf_rejuvenate!(pf_states, mh, (rejuv_sel,))
-        end
-        pf_update!(pf_states, (total_gems_picked_up, possible_gems, possible_rewards), (UnknownChange(),), alt_observation)
-    end
-    return pf_states, pf_states
-end
-
-function update_individual_beliefs(pf_state, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
+function update_beliefs(pf_state, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
     if pf_state === nothing
         pf_state = pf_initialize(utterance_model, (gem_count, possible_gems, possible_rewards), alt_observation, num_particles)
     else
