@@ -10,11 +10,10 @@ function main()
     ENV["OPENAI_API_KEY"] = api_key
 
     problem_name = "medium"
-    share_beliefs = false
-    ess_thresh = 0.1
-    num_particles = 100
+    ess_thresh = 0.3
+    num_particles = 50
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
-    T = 100
+    T = 50
     
     # Define the output directory
     output_dir = joinpath(@__DIR__, "output")

@@ -6,7 +6,7 @@ using PDDLViz, GLMakie
 using Random
 using SymbolicPlanners: get_value
 using DotEnv
-include("utterances.jl")
+include("agent.jl")
 include("utils.jl")
 include("heuristics.jl")
 
@@ -21,7 +21,6 @@ function run_simulation(
     output_dir::String,
     gridworld_only::Bool = false
 )
-
     PDDL.Arrays.register!()
 
     # Load domain and problem
@@ -44,7 +43,6 @@ function run_simulation(
 
     # Main simulation loop
     actions = []
-    t = 1
     combined_score = 0
     remaining_items = copy(items)
     possible_gems = collect(keys(ground_truth_rewards))
@@ -61,8 +59,17 @@ function run_simulation(
     # Initialize planners
     planners = [RTHS(heuristic, n_iters=0, max_nodes=5) for heuristic in heuristics]
     
-    # Main loop
+    # Initialize observations for each agent
+    observations = Dict(agent => Gen.choicemap() for agent in agents)
+
+    # Initialize previous utterances
+    previous_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
+
+    # Main simulation loop
+    t = 1
     while !isempty(remaining_items) && t <= T
+        println("Step $t:")
+        current_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
         for (i, agent) in enumerate(agents)
             goals = PDDL.Term[]
             rewards = Float64[]        
@@ -73,7 +80,6 @@ function run_simulation(
                 reward = current_beliefs[color]
                 heuristics[i].rewards[color] = reward
 
-                # If the agent believes any remaining gems have postive reward, set the goal to get that gem
                 if reward >= 0
                     push!(goals, PDDL.pddl"(has $agent $gem_obj)")
                     push!(rewards, reward)
@@ -85,10 +91,12 @@ function run_simulation(
             action = boltzmann_action(sol.value_policy, state, agent, 0.)
             state = transition(domain, state, action; check=true)
 
-            # If the agent picks up a gem
+            # Clear previous observations and create new observation for this timestep
+            observations[agent] = Gen.choicemap()
+            observations[agent][(t => :self => :gem_pickup)] = false
+
             if action.name == :pickup
                 item = action.args[2].name
-                println("Step $t:")
                 println("       $agent picked up $item.")
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
@@ -99,35 +107,51 @@ function run_simulation(
                 println("       $agent received $reward score.")
                 println("       Combined score is now $combined_score.")
 
-                observation = Gen.choicemap()
-                observation[(1 => :gem_pickup)] = true
-                observation[(1 => :gem)] = gem
-                observation[(:reward => Symbol(gem))] = reward
-                tr, _ = Gen.generate(utterance_model, (1, possible_gems, possible_rewards), observation)
-                utterance = Gen.get_retval(tr)[1]
-                println("       $agent communicated: $utterance.")
-                
-                alt_observation = Gen.choicemap()
-                gem_count = num_gems_picked_up[agent]
-                alt_observation[gem_count => :utterance => :output] = utterance
-                alt_observation[gem_count => :gem_pickup] = true
-                alt_observation[gem_count => :gem] = gem
+                # Update the observations for pickup
+                observations[agent][(t => :self => :gem_pickup)] = true
+                observations[agent][(t => :self => :gem)] = gem
+                # observations[agent][(t => :self => :reward_received)] = reward
 
-                # Update beliefs
-                pf_states[agent], current_pf_state = update_beliefs(pf_states[agent], gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
-
-                # Calculate and update gem utilities
-                top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
-                gem_certainty = quantify_gem_certainty(top_rewards)
-                utilities, certainties = calculate_gem_utility(gem_certainty)
-
-                beliefs[agent] = utilities
-
-                print_estimated_rewards(agents, beliefs, certainties)
+                # Generate utterance
+                utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                utterance = Gen.get_retval(utterance_tr)
+                current_utterances[agent] = utterance
+                observations[agent][(t => :self => :utterance => :output)] = utterance
+                println("       $agent communicated: $utterance")
             end
+
+            # Add other agents' utterances from the previous timestep to the observations
+            other_agent_index = 1
+            for other_agent in agents
+                if other_agent != agent
+                    if previous_utterances[other_agent] !== nothing
+                        observations[agent][(t => :other_agents => other_agent_index => :spoke)] = true
+                        observations[agent][(t => :other_agents => other_agent_index => :utterance => :output)] = previous_utterances[other_agent]
+                    else
+                        observations[agent][(t => :other_agents => other_agent_index => :spoke)] = false
+                    end
+                    other_agent_index += 1
+                end
+            end
+
+            # Update beliefs for the current agent using only the most recent observation
+            pf_states[agent] = update_beliefs(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
+
+            # Calculate and update gem utilities for the current agent
+            current_pf_state = pf_states[agent]
+            top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
+            gem_certainty = quantify_gem_certainty(top_rewards)
+            utilities, certainties = calculate_gem_utility(gem_certainty)
+            beliefs[agent] = utilities
+
+            print_estimated_rewards(agent, beliefs[agent], certainties)
 
             push!(actions, action)
         end
+
+        # Update previous_utterances for the next timestep
+        previous_utterances = current_utterances
+
         t += 1
     end
 
@@ -138,18 +162,18 @@ function run_simulation(
     return combined_score
 end
 
-function update_beliefs(pf_state, gem_count, possible_gems, possible_rewards, alt_observation, num_particles, ess_thresh)
+function update_beliefs(pf_state, current_timestep, num_agents, possible_gems, possible_rewards, observation, num_particles, ess_thresh)
     if pf_state === nothing
-        pf_state = pf_initialize(utterance_model, (gem_count, possible_gems, possible_rewards), alt_observation, num_particles)
+        pf_state = pf_initialize(agent_model, (current_timestep, num_agents, possible_gems, possible_rewards), observation, num_particles)
     else
-        if effective_sample_size(pf_state) < ess_thresh * num_particles
-            pf_resample!(pf_state, :stratified)
-            rejuv_sel = select()
-            pf_rejuvenate!(pf_state, mh, (rejuv_sel,))
-        end
-        pf_update!(pf_state, (gem_count, possible_gems, possible_rewards), (UnknownChange(),), alt_observation)
+        # if effective_sample_size(pf_state) < ess_thresh * num_particles
+        #     pf_resample!(pf_state, :residual)
+        #     rejuv_sel = Gen.select()
+        #     pf_rejuvenate!(pf_state, mh, (rejuv_sel,))
+        # end
+        pf_update!(pf_state, (current_timestep, num_agents, possible_gems, possible_rewards), (UnknownChange(),), observation)
     end
-    return pf_state, pf_state
+    return pf_state
 end
 
-end # module
+end
