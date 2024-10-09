@@ -11,7 +11,7 @@ function main()
 
     problem_name = "medium"
     ess_thresh = 0.3
-    num_particles = 50
+    num_particles = 200
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
     T = 50
     

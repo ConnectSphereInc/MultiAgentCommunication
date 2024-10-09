@@ -166,6 +166,7 @@ function update_beliefs(pf_state, current_timestep, num_agents, possible_gems, p
     if pf_state === nothing
         pf_state = pf_initialize(agent_model, (current_timestep, num_agents, possible_gems, possible_rewards), observation, num_particles)
     else
+        # todo: fix resample and rejuvination
         # if effective_sample_size(pf_state) < ess_thresh * num_particles
         #     pf_resample!(pf_state, :residual)
         #     rejuv_sel = Gen.select()

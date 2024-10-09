@@ -66,18 +66,30 @@ function quantify_gem_certainty(weighted_rewards)
     return gem_certainty
 end
 
-function calculate_gem_utility(gem_certainty; risk_aversion=0.0)
+function calculate_gem_utility(gem_certainty; risk_aversion=0.0, certainty_threshold=0.5)
     utilities = Dict{Symbol, Int}()
     certainties = Dict{Symbol, Float64}()
     for (gem, info) in gem_certainty
-        # Check if the value is already a number, if not, parse it
         value = if isa(info["most_likely_value"], Number)
             info["most_likely_value"]
         else
             parse(Float64, info["most_likely_value"])
         end
         certainty = info["certainty_percentage"] / 100
-        utility = (1 - risk_aversion) * value + risk_aversion * certainty * value
+        
+        # Favor positive rewards when certainty is low
+        if certainty < certainty_threshold && value < 0
+            utility = 1.0  # Ensure a minimum positive utility
+        else
+            utility = (1 - risk_aversion) * value + risk_aversion * certainty * value
+        end
+        
+        # Add error checking
+        if isnan(utility)
+            @warn "NaN utility calculated for gem $gem. Using 0 instead."
+            utility = 0
+        end
+        
         utilities[gem] = round(Int, utility)  # Round to nearest integer
         certainties[gem] = certainty
     end
@@ -205,11 +217,9 @@ function setup_renderer(agents, gridworld_only)
     )
 end
 
-function print_estimated_rewards(agents, gem_utilities, certainties)
-    for agent in agents
-        println("       $agent's Estimated Rewards:")
-        for (gem, value) in gem_utilities[agent]
-            println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
-        end
+function print_estimated_rewards(agent, beliefs, certainties)
+    println("       $agent's Estimated Rewards:")
+    for (gem, value) in beliefs
+        println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
     end
 end
