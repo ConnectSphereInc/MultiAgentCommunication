@@ -32,3 +32,4 @@ Manifest.toml
 # Output folder
 **/output/
 .env
+*.log
