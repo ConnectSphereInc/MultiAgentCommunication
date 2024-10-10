@@ -50,7 +50,7 @@ function construct_prompt(context::String, examples::Vector{Tuple{String, String
     return prompt
 end
 
-@gen function agent_model_ours(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
+@gen function agent_model_communication(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
     # Reward for each gem type
     rewards::Dict{Symbol, Int} = Dict()
     for gem in possible_gems
@@ -97,13 +97,6 @@ end
     utterance ~ gpt3(prompt)
     return utterance
 end
-
-# ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
-# possible_gems = collect(keys(ground_truth_rewards))
-# possible_rewards = collect(values(ground_truth_rewards))
-# tr, _ = Gen.generate(agent_model, (5, 2, possible_gems, possible_rewards), Gen.choicemap())
-# println(display(Gen.get_choices(tr)))
-
 
 @gen function agent_model_no_communication(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
     # Reward for each gem type

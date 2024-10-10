@@ -4,7 +4,7 @@ using PDDL, PlanningDomains, SymbolicPlanners
 using Gen, GenParticleFilters
 using PDDLViz, GLMakie
 using Random
-using SymbolicPlanners: get_value
+using SymbolicPlanners: get_value, get_goal_terms
 using DotEnv
 include("agent.jl")
 include("utils.jl")
@@ -512,10 +512,10 @@ function run_simulation_communication_perfect_vision(
     beliefs = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
 
     # Initialize heuristics
-    heuristics = [GoalManhattan(agent, beliefs[agent]) for agent in agents]
+    heuristics = [GoalManhattan(agent) for agent in agents]
 
     # Initialize planners
-    planners = [AStarPlanner(heuristic, max_nodes=3) for heuristic in heuristics]
+    planners = [AStarPlanner(heuristic) for heuristic in heuristics]
     
     # Initialize observations for each agent
     observations = Dict(agent => Gen.choicemap() for agent in agents)
@@ -531,82 +531,96 @@ function run_simulation_communication_perfect_vision(
         current_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
         for (i, agent) in enumerate(agents)
 
-            goals = PDDL.Term[]
-            rewards = Float64[]        
-            current_beliefs = beliefs[agent]
+            closest_gem = nothing
+            closest_distance = Inf
+            closest_reward = 0.0
+
             for gem in remaining_items
                 gem_obj = PDDL.Const(gem)
                 color = Symbol(split(string(gem), "_")[1])
-                reward = current_beliefs[color]
-                heuristics[i].rewards[color] = reward
+                reward = beliefs[agent][color]
 
                 if reward >= 0
-                    push!(goals, PDDL.pddl"(has $agent $gem_obj)")
-                    push!(rewards, reward)
-                end
-            end
-
-            spec = MultiGoalReward(goals, rewards, 0.95)
-            sol = planners[i](domain, state, spec)
-            action = collect(sol)[1]
-            state = transition(domain, state, action; check=true)
-
-            # Clear previous observations and create new observation for this timestep
-            observations[agent] = Gen.choicemap()
-            observations[agent][(t => :self => :gem_pickup)] = false
-
-            if action.name == :pickup
-                item = action.args[2].name
-                @info "       $agent picked up $item."
-                remaining_items = filter(x -> x != item, remaining_items)
-                gem = parse_gem(String(item))
-                num_gems_picked_up[agent] += 1
-                total_gems_picked_up += 1
-                reward = ground_truth_rewards[gem]
-                combined_score += reward
-                @info "       $agent received $reward score."
-                @info "       Combined score is now $combined_score."
-
-                # Update the observations for pickup
-                observations[agent][(t => :self => :gem_pickup)] = true
-                observations[agent][(t => :self => :gem)] = gem
-                observations[agent][(t => :self => :reward_received)] = reward
-
-                # Generate utterance
-                utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
-                utterance = Gen.get_retval(utterance_tr)
-                current_utterances[agent] = utterance
-                observations[agent][(t => :self => :utterance => :output)] = utterance
-                @info "       $agent communicated: $utterance"
-            end
-
-            # Add other agents' utterances from the previous timestep to the observations
-            other_agent_index = 1
-            for other_agent in agents
-                if other_agent != agent
-                    if previous_utterances[other_agent] !== nothing
-                        observations[agent][(t => :other_agents => other_agent_index => :spoke)] = true
-                        observations[agent][(t => :other_agents => other_agent_index => :utterance => :output)] = previous_utterances[other_agent]
-                    else
-                        observations[agent][(t => :other_agents => other_agent_index => :spoke)] = false
+                    agent_x, agent_y = get_agent_pos(state, agent)
+                    gem_x = state[Compound(:xloc, [gem_obj])]
+                    gem_y = state[Compound(:yloc, [gem_obj])]
+                    distance = sqrt((agent_x - gem_x)^2 + (agent_y - gem_y)^2)
+                                        
+                    if distance < closest_distance
+                        closest_gem = gem_obj
+                        closest_distance = distance
+                        closest_reward = reward
                     end
-                    other_agent_index += 1
                 end
             end
 
-            # Update beliefs for the current agent using only the most recent observation
-            pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
 
-            # Calculate and update gem utilities for the current agent
-            current_pf_state = pf_states[agent]
-            top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
-            gem_certainty = quantify_gem_certainty(top_rewards)
-            utilities, certainties = calculate_gem_utility(gem_certainty)
-            beliefs[agent] = utilities
+            if closest_gem !== nothing
+                goal = PDDL.pddl"(has $agent $closest_gem)"
+                spec = MultiGoalReward([goal], [closest_reward], 0.95)
+                sol = planners[i](domain, state, spec)
+                action = collect(sol)[1]
+                push!(actions, action)
+                state = transition(domain, state, action; check=true)
 
-            print_estimated_rewards(agent, beliefs[agent], certainties)
+                # Clear previous observations and create new observation for this timestep
+                observations[agent] = Gen.choicemap()
+                observations[agent][(t => :self => :gem_pickup)] = false
 
-            push!(actions, action)
+                if action.name == :pickup
+                    item = action.args[2].name
+                    @info "       $agent picked up $item."
+                    remaining_items = filter(x -> x != item, remaining_items)
+                    gem = parse_gem(String(item))
+                    num_gems_picked_up[agent] += 1
+                    total_gems_picked_up += 1
+                    reward = ground_truth_rewards[gem]
+                    combined_score += reward
+                    @info "       $agent received $reward score."
+                    @info "       Combined score is now $combined_score."
+
+                    # Update the observations for pickup
+                    observations[agent][(t => :self => :gem_pickup)] = true
+                    observations[agent][(t => :self => :gem)] = gem
+                    observations[agent][(t => :self => :reward_received)] = reward
+
+                    # Generate utterance
+                    utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                    utterance = Gen.get_retval(utterance_tr)
+                    current_utterances[agent] = utterance
+                    observations[agent][(t => :self => :utterance => :output)] = utterance
+                    @info "       $agent communicated: $utterance"
+                end
+
+                # Add other agents' utterances from the previous timestep to the observations
+                other_agent_index = 1
+                for other_agent in agents
+                    if other_agent != agent
+                        if previous_utterances[other_agent] !== nothing
+                            observations[agent][(t => :other_agents => other_agent_index => :spoke)] = true
+                            observations[agent][(t => :other_agents => other_agent_index => :utterance => :output)] = previous_utterances[other_agent]
+                        else
+                            observations[agent][(t => :other_agents => other_agent_index => :spoke)] = false
+                        end
+                        other_agent_index += 1
+                    end
+                end
+
+                # Update beliefs for the current agent using only the most recent observation
+                pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
+
+                # Calculate and update gem utilities for the current agent
+                current_pf_state = pf_states[agent]
+                top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
+                gem_certainty = quantify_gem_certainty(top_rewards)
+                utilities, certainties = calculate_gem_utility(gem_certainty)
+                beliefs[agent] = utilities
+
+                print_estimated_rewards(agent, beliefs[agent], certainties)
+            else
+                @warn "No gems with non-negative reward found for $agent"
+            end
+
         end
 
         # Update previous_utterances for the next timestep
@@ -624,10 +638,6 @@ function run_simulation_communication_perfect_vision(
     save(joinpath(output_folder, "plan.mp4"), anim)
 
     close(io)
-
-    # USE KL DIVERGENCE
-    # KL DIVERGENCE
-    # DRAW SKETCHES - SDFDFSDF DS
 
     return combined_score
 end

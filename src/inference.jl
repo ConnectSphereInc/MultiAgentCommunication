@@ -2,7 +2,7 @@ import GenParticleFilters: pf_initialize, pf_update!, pf_resample!, pf_rejuvenat
 
 function update_beliefs_communication(pf_state, current_timestep, num_agents, possible_gems, possible_rewards, observation, num_particles, ess_thresh)
     if pf_state === nothing
-        pf_state = pf_initialize(agent_model_ours, (current_timestep, num_agents, possible_gems, possible_rewards), observation, num_particles)
+        pf_state = pf_initialize(agent_model_communication, (current_timestep, num_agents, possible_gems, possible_rewards), observation, num_particles)
     else
         pf_update!(pf_state, (current_timestep, num_agents, possible_gems, possible_rewards), (UnknownChange(),), observation)
     end

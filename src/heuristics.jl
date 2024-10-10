@@ -113,40 +113,31 @@ function get_on_grid_gems(domain::Domain, state::State)
     return on_grid_gems
 end
 
+"""
+The Manhattan distance heuristic as implemented in Plinf.jl.
+https://github.com/ztangent/Plinf.jl
+"""
 struct GoalManhattan <: Heuristic
     agent::Symbol
-    rewards::Dict{Symbol, Float64}
-    visited_states::Dict{Tuple{Int,Int}, Int}
-end
-
-# Constructor
-function GoalManhattan(agent::Symbol, rewards::Dict{Symbol, Float64})
-    return GoalManhattan(agent, rewards, Dict{Tuple{Int,Int}, Int}())
 end
 
 function SymbolicPlanners.compute(h::GoalManhattan, domain::Domain, state::State, spec::Specification)
     agent = h.agent
-
-    # Get all non-offgrid gems
-    all_gems = get_on_grid_gems(domain, state)
-
-    # Filter gems with non-negative reward
-    positive_reward_gems = [(gem, pos) for (gem, pos) in all_gems if h.rewards[gem_to_color(gem)] >= 0]
-    
-    agent_pos = get_agent_pos(state, agent)
-    
-    if isempty(positive_reward_gems)
-        # Exploration heuristic when no gems believed to be postive
-        visit_count = get(h.visited_states, agent_pos, 0)
-        exploration_value = 1.0 / (visit_count + 1)  # Encourage exploring less-visited states
-        h.visited_states[agent_pos] = visit_count + 1
-        return exploration_value
-    else
-        # Compute minimum distance to valuable gems
-        min_dist = minimum(positive_reward_gems) do (gem, gem_pos)
-            sum(abs.(agent_pos .- gem_pos))
-        end
-        
-        return min_dist + length(positive_reward_gems)
+    # Count number of remaining goals to satisfy
+    goal_count = GoalCountHeuristic()(domain, state, spec)
+    # Determine goal objects to collect
+    goals = get_goal_terms(spec)
+    goal_objs = [g.args[2] for g in goals if g.name == :has && g.args[1] == agent && !state[g]]
+    if isempty(goal_objs)
+        return goal_count
     end
+    # Compute minimum distance to goal objects
+    agent_pos = get_agent_pos(state, agent)
+    min_dist = minimum(goal_objs) do obj
+        gem_x = state[Compound(:xloc, [obj])]
+        gem_y = state[Compound(:yloc, [obj])]
+        abs(agent_pos[1] - gem_x) + abs(agent_pos[2] - gem_y)
+    end
+    value = min_dist + goal_count
+    return value
 end
