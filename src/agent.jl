@@ -1,7 +1,5 @@
 using Gen, GenGPT3
 using Random
-import Gen: ParticleFilterState
-import GenParticleFilters: pf_initialize, pf_update!, pf_resample!, pf_rejuvenate!, get_norm_weights, get_traces, effective_sample_size
 
 @dist labeled_uniform(labels) = labels[uniform_discrete(1, length(labels))]
 
@@ -52,7 +50,7 @@ function construct_prompt(context::String, examples::Vector{Tuple{String, String
     return prompt
 end
 
-@gen function agent_model(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
+@gen function agent_model_communication(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
     # Reward for each gem type
     rewards::Dict{Symbol, Int} = Dict()
     for gem in possible_gems
@@ -64,10 +62,22 @@ end
         gem_pickup = {t => :self => :gem_pickup} ~ bernoulli(0.5)
         if gem_pickup
             gem = {t => :self => :gem} ~ labeled_uniform(possible_gems)
-            {t => :self} ~ utterance_model(gem, rewards[gem])
+
+            # Agent is likely to observe the correct reward
+            num_rewards = length(possible_rewards)
+            correct_prob = 0.96  # High probability of observing the correct reward
+            error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
+            probs = fill(error_prob, num_rewards)
+
+            @dist gem_observation() = possible_rewards[categorical(probs)]
+            correct_index = findfirst(r -> r == rewards[gem], possible_rewards)
+            probs[correct_index] = correct_prob
+
+            reward = {t => :self => :reward_received} ~ gem_observation()
+            {t => :self} ~ utterance_model(gem, reward)
         end
 
-        # Agent observes utteraces of the other agents (from the previous timestep)
+        # Agent observes utterances of the other agents (from the previous timestep)
         for i in 1:num_agents-1
             spoke = {t => :other_agents => i => :spoke} ~ bernoulli(0.5)
             if spoke
@@ -86,4 +96,34 @@ end
     prompt = construct_prompt(context, EXAMPLES_PICKUP)
     utterance ~ gpt3(prompt)
     return utterance
+end
+
+@gen function agent_model_no_communication(T::Int, num_agents::Int, possible_gems::Vector{Symbol}, possible_rewards::Vector{Int})
+    # Reward for each gem type
+    rewards::Dict{Symbol, Int} = Dict()
+    for gem in possible_gems
+        rewards[gem] = {:reward => Symbol(gem)} ~ labeled_uniform(possible_rewards)
+    end
+
+    for t = 1:T
+        # Potential gem pickup and utterance by this agent
+        gem_pickup = {t => :self => :gem_pickup} ~ bernoulli(0.5)
+        if gem_pickup
+            gem = {t => :self => :gem} ~ labeled_uniform(possible_gems)
+
+            # Agent is likely to observe the correct reward
+            num_rewards = length(possible_rewards)
+            correct_prob = 0.96  # High probability of observing the correct reward
+            error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
+            probs = fill(error_prob, num_rewards)
+
+            @dist gem_observation() = possible_rewards[categorical(probs)]
+            correct_index = findfirst(r -> r == rewards[gem], possible_rewards)
+            probs[correct_index] = correct_prob
+
+            reward = {t => :self => :reward_received} ~ gem_observation()
+        end
+    end
+
+    return rewards
 end

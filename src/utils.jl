@@ -1,5 +1,7 @@
 using DataStructures: OrderedDict
 using PDDLViz: RGBA, to_color, set_alpha
+using Logging
+using OpenAI
 
 "Gets the (x, y) position of the specified agent."
 function get_agent_pos(state::State, agent::Symbol)
@@ -218,8 +220,87 @@ function setup_renderer(agents, gridworld_only)
 end
 
 function print_estimated_rewards(agent, beliefs, certainties)
-    println("       $agent's Estimated Rewards:")
+    @info "       $agent's Estimated Rewards:"
     for (gem, value) in beliefs
-        println("              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))")
+        @info "              $gem: value = $value, certainty = $(round(certainties[gem], digits=2))"
     end
+end
+
+function setup_logging(output_folder::String, filename::String)
+    # Ensure the output folder exists
+    mkpath(output_folder)
+    
+    log_file = joinpath(output_folder, filename)
+    io = open(log_file, "w")
+    logger = CleanLogger(io, Logging.Info)
+    global_logger(logger)
+    return io
+end
+
+struct CleanLogger <: AbstractLogger
+    io::IO
+    min_level::LogLevel
+end
+
+function Logging.handle_message(logger::CleanLogger, level, message, _module, group, id, file, line; kwargs...)
+    if level >= logger.min_level
+        println(logger.io, message)
+    end
+    return nothing
+end
+
+Logging.shouldlog(logger::CleanLogger, level, _module, group, id) = level >= logger.min_level
+Logging.min_enabled_level(logger::CleanLogger) = logger.min_level
+Logging.catch_exceptions(logger::CleanLogger) = false
+
+function gpt4o(prompt::String; max_retries=5, base_wait_time=1.0)
+    secret_key = ENV["OPENAI_API_KEY"]
+    model = "gpt-4o"
+
+    for attempt in 1:max_retries
+        try
+            r = create_chat(
+                secret_key,
+                model,
+                [Dict("role" => "user", "content" => prompt)]
+            )
+            
+            return r.response[:choices][1][:message][:content]
+        catch e
+            if attempt < max_retries
+                wait_time = base_wait_time * (2^(attempt - 1))
+                sleep(wait_time)
+            else
+                throw(e)
+            end
+        end
+    end
+    
+    error("Max retries reached. Unable to complete the request.")
+end
+
+function parse_belief(input::String)
+    beliefs = Dict{Symbol, Float64}()
+    
+    # Regular expression to match gem colors and their associated values
+    pattern = r"(red|blue|yellow|green)\s*:\s*([-]?\d+(?:\.\d+)?)"
+    
+    # Find all matches in the input string
+    matches = eachmatch(pattern, lowercase(input))
+    
+    # Process each match
+    for m in matches
+        color = Symbol(m.captures[1])
+        value = parse(Float64, m.captures[2])
+        beliefs[color] = value
+    end
+    
+    # Ensure all colors are present, default to 0.0 if missing
+    for color in [:red, :blue, :yellow, :green]
+        if !haskey(beliefs, color)
+            beliefs[color] = 0.0
+        end
+    end
+    
+    return beliefs
 end
