@@ -1,9 +1,19 @@
+"""
+    VisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
+
+    A heuristic that encourages the agent to collect gems with positive rewards and discourages backtracking.
+"""
 struct VisionGemHeuristic <: Heuristic
     agent::Symbol
     rewards::Dict{Symbol, Float64} # Colour to reward value
     visited_states::Dict{Tuple{Int,Int}, Int}
 end
 
+"""
+    VisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
+
+    Create a VisionGemHeuristic object with the given agent and rewards.
+"""
 function VisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
     return VisionGemHeuristic(agent, rewards, Dict{Tuple{Int,Int}, Int}())
 end
@@ -31,53 +41,23 @@ function SymbolicPlanners.compute(h::VisionGemHeuristic, domain::Domain, state::
     return value
 end
 
-function get_visible_gems(domain::Domain, state::State, agent::Symbol)
-    visible_gems = Tuple{Symbol, Tuple{Int64, Int64}}[]
-    for obj in PDDL.get_objects(domain, state, :item)
-        if PDDL.satisfy(domain, state, PDDL.parse_pddl("(visible $agent $(obj.name))"))
-            x = state[Compound(:xloc, [obj])]
-            y = state[Compound(:yloc, [obj])]
-            push!(visible_gems, (Symbol(obj.name), (x, y)))
-        end
-    end
-    return visible_gems
-end
+"""
+    RestrictedVisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
 
-function astar_path_length(domain::Domain, state::State, agent::Symbol, gem_pos::Tuple{Int,Int})
-    goal = PDDL.parse_pddl("(and (= (xloc $agent) $(gem_pos[1])) (= (yloc $agent) $(gem_pos[2])))")
-    planner = AStarPlanner(GoalCountHeuristic())
-    spec = MinStepsGoal(goal)
-    solution = planner(domain, state, spec)
-    return length(solution)
-end
-
-function get_gem_on_tile(domain::Domain, state::State, agent::Symbol)
-    agent_pos = get_agent_pos(state, agent)
-    agent_x, agent_y = agent_pos
-    
-    for obj in PDDL.get_objects(domain, state, :item)
-        x = state[Compound(:xloc, [obj])]
-        y = state[Compound(:yloc, [obj])]
-        if x == agent_x && y == agent_y
-            return (Symbol(obj.name), (x, y))
-        end
-    end
-    
-    return nothing
-end
-
-
-struct ShortSightedVisionGemHeuristic <: Heuristic
+    A heuristic that encourages the agent to collect gems with positive rewards and discourages backtracking.
+    This heuristic does not consider the distance to the gems.
+"""
+struct RestrictedVisionGemHeuristic <: Heuristic
     agent::Symbol
     rewards::Dict{Symbol, Float64} # Colour to reward value
     visited_states::Dict{Tuple{Int,Int}, Int}
 end
 
-function ShortSightedVisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
-    return ShortSightedVisionGemHeuristic(agent, rewards, Dict{Tuple{Int,Int}, Int}())
+function RestrictedVisionGemHeuristic(agent::Symbol, rewards::Dict{Symbol, Float64})
+    return RestrictedVisionGemHeuristic(agent, rewards, Dict{Tuple{Int,Int}, Int}())
 end
 
-function SymbolicPlanners.compute(h::ShortSightedVisionGemHeuristic, domain::Domain, state::State, spec::Specification)
+function SymbolicPlanners.compute(h::RestrictedVisionGemHeuristic, domain::Domain, state::State, spec::Specification)
     agent = h.agent
     agent_pos = get_agent_pos(state, agent)
     gem_on_tile = get_gem_on_tile(domain, state, agent)
@@ -97,20 +77,6 @@ function SymbolicPlanners.compute(h::ShortSightedVisionGemHeuristic, domain::Dom
     h.visited_states[agent_pos] = get(h.visited_states, agent_pos, 0) + 1
     
     return value
-end
-
-function get_on_grid_gems(domain::Domain, state::State)
-    on_grid_gems = Tuple{Symbol, Tuple{Int64, Int64}}[]
-    all_gems = PDDL.get_objects(domain, state, :gem)    
-    for obj in all_gems
-        is_offgrid = PDDL.satisfy(domain, state, PDDL.parse_pddl("(offgrid $(obj.name))"))
-        if !is_offgrid
-            x = state[Compound(:xloc, [obj])]
-            y = state[Compound(:yloc, [obj])]
-            push!(on_grid_gems, (Symbol(obj.name), (x, y)))
-        end
-    end
-    return on_grid_gems
 end
 
 """

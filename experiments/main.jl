@@ -36,13 +36,15 @@ function main()
     files = readdir(problem_folder)
     problems = [joinpath(problem_folder, file) for file in files]
     
+
     ############# Parameters #############
     ess_thresh = 0.3
-    num_particles = 10
+    num_particles = 100
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
     T = 50
     repeats = 1
     ######################################
+
 
     # Run communication_vision
     task = "communication_vision"
@@ -67,63 +69,95 @@ function main()
         end
     end
 
-    # task = "no_communication_vision"
-    # for problem in problems
-    #     name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-    #     output_dir = joinpath(@__DIR__, "output", task, name)
-    #     mkpath(output_dir)
-    #     _ = run_simulation_no_communication_vision(
-    #         problem,
-    #         output_dir,
-    #         ess_thresh,
-    #         num_particles,
-    #         ground_truth_rewards,
-    #         T
-    #     )
-    # end
+    # Run no_communication_vision
+    task = "no_communication_vision"
+    csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
+    init_csv(csv_filename)
+    for problem in problems
+        for repeat in 1:repeats
+            name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
+            output_dir = joinpath(@__DIR__, "output", task, name)
+            mkpath(output_dir)
+            results = run_simulation_no_communication_vision(
+                problem,
+                output_dir,
+                ess_thresh,
+                num_particles,
+                ground_truth_rewards,
+                T
+            )
+            results.problem_name .= name
+            results.repeat .= repeat
+            CSV.write(csv_filename, results, append=true)
+        end
+    end
 
-    # task = "communication_restricted_vision"
-    # for problem in problems
-    #     name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-    #     output_dir = joinpath(@__DIR__, "output", task, name)
-    #     mkpath(output_dir)
-    #     _ = run_simulation_communication_restricted_vision(
-    #         problem,
-    #         output_dir,
-    #         ess_thresh,
-    #         num_particles,
-    #         ground_truth_rewards,
-    #         T
-    #     )
-    # end
+    # Run communication_restricted_vision
+    task = "communication_restricted_vision"
+    csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
+    init_csv(csv_filename)
+    for problem in problems
+        for repeat in 1:repeats
+            name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
+            output_dir = joinpath(@__DIR__, "output", task, name)
+            mkpath(output_dir)
+            results = run_simulation_communication_restricted_vision(
+                problem,
+                output_dir,
+                ess_thresh,
+                num_particles,
+                ground_truth_rewards,
+                T
+            )
+            results.problem_name .= name
+            results.repeat .= repeat
+            CSV.write(csv_filename, results, append=true)
+        end
+    end
 
-    # task = "communication_perfect_vision"
-    # for problem in problems
-    #     name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-    #     output_dir = joinpath(@__DIR__, "output", task, name)
-    #     mkpath(output_dir)
-    #     _ = run_simulation_communication_perfect_vision(
-    #         problem,
-    #         output_dir,
-    #         ess_thresh,
-    #         num_particles,
-    #         ground_truth_rewards,
-    #         T
-    #     )
-    # end
+    # Run communication_perfect_vision
+    task = "communication_perfect_vision"
+    csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
+    init_csv(csv_filename)
+    for problem in problems
+        for repeat in 1:repeats
+            name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
+            output_dir = joinpath(@__DIR__, "output", task, name)
+            mkpath(output_dir)
+            results = run_simulation_communication_perfect_vision(
+                problem,
+                output_dir,
+                ess_thresh,
+                num_particles,
+                ground_truth_rewards,
+                T
+            )
+            results.problem_name .= name
+            results.repeat .= repeat
+            CSV.write(csv_filename, results, append=true)
+        end
+    end
 
-    # task = "gpt4o"
-    # for problem in problems
-    #     name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-    #     output_dir = joinpath(@__DIR__, "output", task, name)
-    #     mkpath(output_dir)
-    #     _ = run_simulation_gpt4o(
-    #         problem,
-    #         output_dir,
-    #         ground_truth_rewards,
-    #         T
-    #     )
-    # end
+    # Run gpt4o
+    task = "gpt4o"
+    csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
+    init_csv(csv_filename)
+    for problem in problems
+        for repeat in 1:repeats
+            name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
+            output_dir = joinpath(@__DIR__, "output", task, name)
+            mkpath(output_dir)
+            results = run_simulation_gpt4o(
+                problem,
+                output_dir,
+                ground_truth_rewards,
+                T
+            )
+            results.problem_name .= name
+            results.repeat .= repeat
+            CSV.write(csv_filename, results, append=true)
+        end
+    end
 
 end
 

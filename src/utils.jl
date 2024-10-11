@@ -285,6 +285,26 @@ function setup_results()
 end
 
 """
+    setup_results()
+
+    Sets up the results DataFrame for storing simulation data.
+"""
+function setup_results_gpt4o()
+    return DataFrame(
+        timestep = Int[],
+        agent = Int[],
+        score = Float64[],
+        gems_picked_up = Int[],
+        red = Float64[],
+        blue = Float64[],
+        green = Float64[],
+        yellow = Float64[],
+        pickup = String[],
+        utterance = String[]
+    )
+end
+
+"""
     append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_value_probs, item, utterance)
     
     Appends a row to the results DataFrame.
@@ -315,4 +335,94 @@ function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::
         :utterance => utterance
     )
     push!(results, row)
+end
+
+"""
+    append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_value_probs, item, utterance)
+    
+    Appends a row to the results DataFrame.
+"""
+function append_to_results_gpt4o!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_values::Dict, item::String, utterance::String)
+    row = Dict(
+        :timestep => t,
+        :agent => i,
+        :score => combined_score,
+        :gems_picked_up => total_gems_picked_up,
+        :red => gem_values[:red],
+        :blue => gem_values[:blue],
+        :green => gem_values[:green],
+        :yellow => gem_values[:yellow],
+        :pickup => item,
+        :utterance => utterance
+    )
+    push!(results, row)
+end
+
+"""
+    get_visible_gems(domain::Domain, state::State, agent::Symbol)
+
+    Get the visible gems in the state.
+"""
+function get_visible_gems(domain::Domain, state::State, agent::Symbol)
+    visible_gems = Tuple{Symbol, Tuple{Int64, Int64}}[]
+    for obj in PDDL.get_objects(domain, state, :item)
+        if PDDL.satisfy(domain, state, PDDL.parse_pddl("(visible $agent $(obj.name))"))
+            x = state[Compound(:xloc, [obj])]
+            y = state[Compound(:yloc, [obj])]
+            push!(visible_gems, (Symbol(obj.name), (x, y)))
+        end
+    end
+    return visible_gems
+end
+
+"""
+    astar_path_length(domain::Domain, state::State, agent::Symbol, gem_pos::Tuple{Int,Int})
+
+    Compute the length of the shortest path from the agent to the gem at the given position.
+"""
+function astar_path_length(domain::Domain, state::State, agent::Symbol, gem_pos::Tuple{Int,Int})
+    goal = PDDL.parse_pddl("(and (= (xloc $agent) $(gem_pos[1])) (= (yloc $agent) $(gem_pos[2])))")
+    planner = AStarPlanner(GoalCountHeuristic())
+    spec = MinStepsGoal(goal)
+    solution = planner(domain, state, spec)
+    return length(solution)
+end
+
+"""
+    get_gem_on_tile(domain::Domain, state::State, agent::Symbol)
+
+    Get the gem on the same tile as the agent.
+"""
+function get_gem_on_tile(domain::Domain, state::State, agent::Symbol)
+    agent_pos = get_agent_pos(state, agent)
+    agent_x, agent_y = agent_pos
+    
+    for obj in PDDL.get_objects(domain, state, :item)
+        x = state[Compound(:xloc, [obj])]
+        y = state[Compound(:yloc, [obj])]
+        if x == agent_x && y == agent_y
+            return (Symbol(obj.name), (x, y))
+        end
+    end
+    
+    return nothing
+end
+
+"""
+    get_on_grid_gems(domain::Domain, state::State)
+
+    Get the gems that are on the grid.
+"""
+function get_on_grid_gems(domain::Domain, state::State)
+    on_grid_gems = Tuple{Symbol, Tuple{Int64, Int64}}[]
+    all_gems = PDDL.get_objects(domain, state, :gem)    
+    for obj in all_gems
+        is_offgrid = PDDL.satisfy(domain, state, PDDL.parse_pddl("(offgrid $(obj.name))"))
+        if !is_offgrid
+            x = state[Compound(:xloc, [obj])]
+            y = state[Compound(:yloc, [obj])]
+            push!(on_grid_gems, (Symbol(obj.name), (x, y)))
+        end
+    end
+    return on_grid_gems
 end
