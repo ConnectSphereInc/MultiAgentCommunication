@@ -4,6 +4,7 @@ authors = ["ciaran-regan-ie <ciaranregan123@gmail.com>"]
 version = "0.1.0"
 
 [deps]
+DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
 DataStructures = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
 DotEnv = "4dc1fcf4-5e3b-5448-94ab-0c38ec0385c1"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"

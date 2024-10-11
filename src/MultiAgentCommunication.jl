@@ -6,6 +6,8 @@ using PDDLViz, GLMakie
 using Random
 using SymbolicPlanners: get_value, get_goal_terms
 using DotEnv
+using DataFrames
+
 include("agent.jl")
 include("utils.jl")
 include("heuristics.jl")
@@ -22,93 +24,81 @@ function run_simulation_communication_vision(
     T::Int,
     gridworld_only::Bool = false
 )
-    io = setup_logging(output_folder, "simulation_log.txt")
-
-    PDDL.Arrays.register!()
+    results = setup_results()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
     problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
     
-    # Retrieve objects before compilation
     items = [obj.name for obj in PDDL.get_objects(domain, initial_state, :gem)]
     agents = Symbol[obj.name for obj in PDDL.get_objects(domain, initial_state, :agent)]
     
     # Renderer setup
     renderer = setup_renderer(agents, gridworld_only)
     canvas = renderer(domain, initial_state)
-
-    # Output setup
-    
-    io = setup_logging(output_folder, "simulation_log.txt")
     save(joinpath(output_folder, "initial_state.png"), canvas)
 
     # Main simulation loop
     actions = []
     combined_score = 0
+    total_gems_picked_up = 0
+    num_gems_picked_up = Dict(agent => 0 for agent in agents)
     remaining_items = copy(items)
     possible_gems = collect(keys(ground_truth_rewards))
     possible_rewards = collect(values(ground_truth_rewards))
-    num_gems_picked_up = Dict(agent => 0 for agent in agents)
-    total_gems_picked_up = 0
     state = initial_state
 
-    # Initialize beliefs and heuristics optimistically
+    # Initialize beliefs
     pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
     beliefs = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
-    heuristics = [VisionGemHeuristic(agent, beliefs[agent]) for agent in agents]
 
     # Initialize planners
+    heuristics = [VisionGemHeuristic(agent, beliefs[agent]) for agent in agents]
     planners = [RTHS(heuristic, n_iters=0, max_nodes=5) for heuristic in heuristics]
-    
-    # Initialize observations for each agent
-    observations = Dict(agent => Gen.choicemap() for agent in agents)
 
-    # Initialize previous utterances
+    # Initialize observations
+    observations = Dict(agent => Gen.choicemap() for agent in agents)
     previous_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
 
     # Main simulation loop
     t = 1
     while !isempty(remaining_items) && t <= T
-        @info "Step $t:"
         current_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
         for (i, agent) in enumerate(agents)
+
+            # Update the agents goal
             goals = PDDL.Term[]
-            rewards = Float64[]        
-            current_beliefs = beliefs[agent]
+            rewards = Float64[]
             for gem in remaining_items
                 gem_obj = PDDL.Const(gem)
                 color = Symbol(split(string(gem), "_")[1])
-                reward = current_beliefs[color]
+                reward = beliefs[agent][color]
                 heuristics[i].rewards[color] = reward
-
                 if reward >= 0
                     push!(goals, PDDL.pddl"(has $agent $gem_obj)")
                     push!(rewards, reward)
                 end
             end
 
+            # Solve plan, select action and transition state
             spec = MultiGoalReward(goals, rewards, 0.95)
             sol = planners[i](domain, state, spec)
             action = boltzmann_action(sol.value_policy, state, agent, 0.)
             state = transition(domain, state, action; check=true)
 
-            # Clear previous observations and create new observation for this timestep
+            # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-
+            item, utterance = "none", "none"
             if action.name == :pickup
                 item = action.args[2].name
-                @info "       $agent picked up $item."
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
                 reward = ground_truth_rewards[gem]
                 combined_score += reward
-                @info "       $agent received $reward score."
-                @info "       Combined score is now $combined_score."
 
                 # Update the observations for pickup
                 observations[agent][(t => :self => :gem_pickup)] = true
@@ -120,10 +110,9 @@ function run_simulation_communication_vision(
                 utterance = Gen.get_retval(utterance_tr)
                 current_utterances[agent] = utterance
                 observations[agent][(t => :self => :utterance => :output)] = utterance
-                @info "       $agent communicated: $utterance"
             end
 
-            # Add other agents' utterances from the previous timestep to the observations
+            # Agent observes other agents' utterances from the previous timestep
             other_agent_index = 1
             for other_agent in agents
                 if other_agent != agent
@@ -137,38 +126,25 @@ function run_simulation_communication_vision(
                 end
             end
 
-            # Update beliefs for the current agent using only the most recent observation
+            # Run particle filter and update beliefs
             pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
-
-            # Calculate and update gem utilities for the current agent
-            current_pf_state = pf_states[agent]
-            top_rewards = get_top_weighted_rewards(current_pf_state, 10, possible_gems)
-            gem_certainty = quantify_gem_certainty(top_rewards)
-            utilities, certainties = calculate_gem_utility(gem_certainty)
+            gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
+            utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
 
-            print_estimated_rewards(agent, beliefs[agent], certainties)
-
+            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance)
             push!(actions, action)
         end
-
-        # Update previous_utterances for the next timestep
+        
         previous_utterances = current_utterances
-
         t += 1
     end
 
-    @info "Time: $t"
-    @info "Total gems picked up: $total_gems_picked_up"
-    @info "Final score: $combined_score"
-
     # Generate and save animation
-    anim = anim_plan(renderer, domain, initial_state, actions; format="gif", framerate=2)
+    anim = anim_plan(renderer, domain, initial_state, actions; format="gif", framerate=1)
     save(joinpath(output_folder, "plan.mp4"), anim)
 
-    close(io)
-
-    return combined_score
+    return results
 end
 
 function run_simulation_no_communication_vision(
