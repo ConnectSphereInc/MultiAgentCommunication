@@ -1,4 +1,4 @@
-(define (problem medium)
+(define (problem medium-1)
     (:domain vision)
     (:objects
         red_gem1 red_gem2 - red

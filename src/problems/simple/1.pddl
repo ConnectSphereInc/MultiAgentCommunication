@@ -1,4 +1,4 @@
-(define (problem simple)
+(define (problem simple-1)
     (:domain vision)
     (:objects red_gem1 - red
               blue_gem2 - blue

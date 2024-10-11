@@ -14,24 +14,21 @@ include("inference.jl")
 export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o
 
 function run_simulation_communication_vision(
-    problem_name::String,
+    problem_path::String,
+    output_folder::String,
     ess_thresh::Float64,
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    output_dir::String,
     gridworld_only::Bool = false
 )
-    task = "communication_vision"
-    output_folder = joinpath(output_dir, task, problem_name)
-    mkpath(output_folder)
     io = setup_logging(output_folder, "simulation_log.txt")
 
     PDDL.Arrays.register!()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem::Problem = load_problem(joinpath(@__DIR__, "problems", problem_name * ".pddl"))
+    problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
     
     # Retrieve objects before compilation
@@ -175,24 +172,21 @@ function run_simulation_communication_vision(
 end
 
 function run_simulation_no_communication_vision(
-    problem_name::String,
+    problem_path::String,
+    output_folder::String,
     ess_thresh::Float64,
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    output_dir::String,
     gridworld_only::Bool = false
 )
-    task = "no_communication_vision"
-    output_folder = joinpath(output_dir, task, problem_name)
-    mkpath(output_folder)
     io = setup_logging(output_folder, "simulation_log.txt")
 
     PDDL.Arrays.register!()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem::Problem = load_problem(joinpath(@__DIR__, "problems", problem_name * ".pddl"))
+    problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
 
     # Retrieve objects before compilation
@@ -311,24 +305,21 @@ function run_simulation_no_communication_vision(
 end
 
 function run_simulation_communication_restricted_vision(
-    problem_name::String,
+    problem_path::String,
+    output_folder::String,
     ess_thresh::Float64,
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    output_dir::String,
     gridworld_only::Bool = false
 )
-    task = "communication_restricted_vision"
-    output_folder = joinpath(output_dir, task, problem_name)
-    mkpath(output_folder)
     io = setup_logging(output_folder, "simulation_log.txt")
 
     PDDL.Arrays.register!()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem::Problem = load_problem(joinpath(@__DIR__, "problems", problem_name * ".pddl"))
+    problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
 
     # Retrieve objects before compilation
@@ -468,24 +459,21 @@ function run_simulation_communication_restricted_vision(
 end
 
 function run_simulation_communication_perfect_vision(
-    problem_name::String,
+    problem_path::String,
+    output_folder::String,
     ess_thresh::Float64,
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    output_dir::String,
     gridworld_only::Bool = false
 )
-    task = "communication_perfect_vision"
-    output_folder = joinpath(output_dir, task, problem_name)
-    mkpath(output_folder)
     io = setup_logging(output_folder, "simulation_log.txt")
 
     PDDL.Arrays.register!()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem::Problem = load_problem(joinpath(@__DIR__, "problems", problem_name * ".pddl"))
+    problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
 
     # Retrieve objects before compilation
@@ -643,24 +631,21 @@ function run_simulation_communication_perfect_vision(
 end
 
 function run_simulation_gpt4o(
-    problem_name::String,
+    problem_path::String,
+    output_folder::String,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    output_dir::String,
     gridworld_only::Bool = false
 )
-    task = "gpt4o"
-    output_folder = joinpath(output_dir, task, problem_name)
-    mkpath(output_folder)
     io = setup_logging(output_folder, "simulation_log.txt")
 
     PDDL.Arrays.register!()
 
     # Load domain and problem
     domain = load_domain(joinpath(@__DIR__, "domain.pddl"))
-    problem::Problem = load_problem(joinpath(@__DIR__, "problems", problem_name * ".pddl"))
+    problem::Problem = load_problem(problem_path)
     initial_state = initstate(domain, problem)
-    
+
     # Retrieve objects before compilation
     items = [obj.name for obj in PDDL.get_objects(domain, initial_state, :gem)]
     agents = Symbol[obj.name for obj in PDDL.get_objects(domain, initial_state, :agent)]
