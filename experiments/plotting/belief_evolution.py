@@ -35,6 +35,11 @@ def plot_most_likely_gem_values(problem_name):
     agent_1_data.loc[:, 'most_likely_green_mapped'] = agent_1_data['most_likely_green'].map(value_map)
     agent_1_data.loc[:, 'most_likely_yellow_mapped'] = agent_1_data['most_likely_yellow'].map(value_map)
 
+    # Apply small vertical offsets to make lines more distinct
+    agent_1_data['most_likely_blue_mapped'] += 0.02  # Offset blue
+    agent_1_data['most_likely_green_mapped'] -= 0.02  # Offset green
+    agent_1_data['most_likely_yellow_mapped'] += 0.03  # Offset yellow
+
     # Filter data for agent 2 (to get utterances)
     agent_2_data = problem_data[problem_data['agent'] == 2]
 
@@ -58,8 +63,8 @@ def plot_most_likely_gem_values(problem_name):
     plt.yticks(list(value_map.values()), list(value_map.keys()))
 
     plt.xlabel('Timestep')
-    plt.ylabel('Most Likely Gem Reward')
-    plt.title(f"Most Likely Gem Value for Agent 1 Over Time for {problem_name}")
+    plt.ylabel('Reward')
+    plt.title(f"Evolution of Reward Beliefs for Agent 1 in Task {problem_name}")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
