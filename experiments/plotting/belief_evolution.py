@@ -11,70 +11,73 @@ def plot_most_likely_gem_values(problem_name):
     # Filter data for the specific problem
     problem_data = df[df['problem_name'] == problem_name]
 
-    # Filter data for agent 1 within the specific problem
-    agent_1_data = problem_data[problem_data['agent'] == 1].copy()  # Use .copy() to avoid SettingWithCopyWarning
+    for agent in [1, 2]:
+        # Filter data for agent 1 within the specific problem
+        agent_data = problem_data[problem_data['agent'] == agent].copy()  # Use .copy() to avoid SettingWithCopyWarning
 
-    # Function to find the most likely value for each timestep for a specific gem color
-    def most_likely_values(agent_data, gem_prefix):
-        cols = [f'{gem_prefix}_m5', f'{gem_prefix}_1', f'{gem_prefix}_2', f'{gem_prefix}_3']
-        values = np.array([-5, 1, 2, 3])
-        return values[np.argmax(agent_data[cols].values, axis=1)]
+        # Function to find the most likely value for each timestep for a specific gem color
+        def most_likely_values(agent_data, gem_prefix):
+            cols = [f'{gem_prefix}_m5', f'{gem_prefix}_1', f'{gem_prefix}_2', f'{gem_prefix}_3']
+            values = np.array([-5, 1, 2, 3])
+            return values[np.argmax(agent_data[cols].values, axis=1)]
 
-    # Calculate most likely gem value for each timestep for all gem colors
-    agent_1_data.loc[:, 'most_likely_red'] = most_likely_values(agent_1_data, 'red')
-    agent_1_data.loc[:, 'most_likely_blue'] = most_likely_values(agent_1_data, 'blue')
-    agent_1_data.loc[:, 'most_likely_green'] = most_likely_values(agent_1_data, 'green')
-    agent_1_data.loc[:, 'most_likely_yellow'] = most_likely_values(agent_1_data, 'yellow')
+        # Calculate most likely gem value for each timestep for all gem colors
+        agent_data.loc[:, 'most_likely_red'] = most_likely_values(agent_data, 'red')
+        agent_data.loc[:, 'most_likely_blue'] = most_likely_values(agent_data, 'blue')
+        agent_data.loc[:, 'most_likely_green'] = most_likely_values(agent_data, 'green')
+        agent_data.loc[:, 'most_likely_yellow'] = most_likely_values(agent_data, 'yellow')
 
-    # Map the gem values to discrete numbers for categorical plotting
-    value_map = {-5: 0, 1: 1, 2: 2, 3: 3}
+        # Map the gem values to discrete numbers for categorical plotting
+        value_map = {-5: 0, 1: 1, 2: 2, 3: 3}
 
-    # Apply the mapping to the most likely gem values for easier plotting
-    agent_1_data.loc[:, 'most_likely_red_mapped'] = agent_1_data['most_likely_red'].map(value_map)
-    agent_1_data.loc[:, 'most_likely_blue_mapped'] = agent_1_data['most_likely_blue'].map(value_map)
-    agent_1_data.loc[:, 'most_likely_green_mapped'] = agent_1_data['most_likely_green'].map(value_map)
-    agent_1_data.loc[:, 'most_likely_yellow_mapped'] = agent_1_data['most_likely_yellow'].map(value_map)
+        # Apply the mapping to the most likely gem values for easier plotting
+        agent_data.loc[:, 'most_likely_red_mapped'] = agent_data['most_likely_red'].map(value_map)
+        agent_data.loc[:, 'most_likely_blue_mapped'] = agent_data['most_likely_blue'].map(value_map)
+        agent_data.loc[:, 'most_likely_green_mapped'] = agent_data['most_likely_green'].map(value_map)
+        agent_data.loc[:, 'most_likely_yellow_mapped'] = agent_data['most_likely_yellow'].map(value_map)
 
-    # Apply small vertical offsets to make lines more distinct
-    agent_1_data['most_likely_blue_mapped'] += 0.02  # Offset blue
-    agent_1_data['most_likely_green_mapped'] -= 0.02  # Offset green
-    agent_1_data['most_likely_yellow_mapped'] += 0.03  # Offset yellow
+        # Apply small vertical offsets to make lines more distinct
+        agent_data['most_likely_blue_mapped'] += 0.02  # Offset blue
+        agent_data['most_likely_green_mapped'] -= 0.02  # Offset green
+        agent_data['most_likely_yellow_mapped'] += 0.03  # Offset yellow
 
-    # Filter data for agent 2 (to get utterances)
-    agent_2_data = problem_data[problem_data['agent'] == 2]
+        # Filter data for agent 2 (to get utterances)
+        agent_2_data = problem_data[problem_data['agent'] == 2]
 
-    # Plot the evolution of most likely gem values with adjusted colors and opacity
-    plt.figure(figsize=(10, 6))
+        # Plot the evolution of most likely gem values with adjusted colors and opacity
+        plt.figure(figsize=(10, 6))
 
-    plt.plot(agent_1_data['timestep'], agent_1_data['most_likely_red_mapped'], label='Red Gem', color='crimson', alpha=0.8)
-    plt.plot(agent_1_data['timestep'], agent_1_data['most_likely_blue_mapped'], label='Blue Gem', color='royalblue', alpha=0.8)
-    plt.plot(agent_1_data['timestep'], agent_1_data['most_likely_green_mapped'], label='Green Gem', color='forestgreen', alpha=0.8)
-    plt.plot(agent_1_data['timestep'], agent_1_data['most_likely_yellow_mapped'], label='Yellow Gem', color='gold', alpha=0.8)
+        plt.plot(agent_data['timestep'], agent_data['most_likely_red_mapped'], label='Red Gem', color='crimson', alpha=0.8)
+        plt.plot(agent_data['timestep'], agent_data['most_likely_blue_mapped'], label='Blue Gem', color='royalblue', alpha=0.8)
+        plt.plot(agent_data['timestep'], agent_data['most_likely_green_mapped'], label='Green Gem', color='forestgreen', alpha=0.8)
+        plt.plot(agent_data['timestep'], agent_data['most_likely_yellow_mapped'], label='Yellow Gem', color='gold', alpha=0.8)
 
-    # Add vertical lines for agent 1 pickups
-    for t in agent_1_data[agent_1_data['pickup'] != 'none']['timestep']:
-        plt.axvline(x=t, color='black', linestyle='-', alpha=0.6, label='Agent 1 Pickup' if t == agent_1_data[agent_1_data['pickup'] != 'none']['timestep'].iloc[0] else "")
+        # Add vertical lines for agent 1 pickups
+        for t in agent_data[agent_data['pickup'] != 'none']['timestep']:
+            plt.axvline(x=t, color='black', linestyle='-', alpha=0.6, label='Agent 1 Pickup' if t == agent_data[agent_data['pickup'] != 'none']['timestep'].iloc[0] else "")
 
-    # Add vertical lines for Agent 2's communication in the previous timestep
-    for t in agent_2_data[agent_2_data['utterance'] != 'none']['timestep']:
-        plt.axvline(x=t + 1, color='black', linestyle='--', alpha=0.5, label='Agent 2 Communication' if t == agent_2_data[agent_2_data['utterance'] != 'none']['timestep'].iloc[0] else "")
+        # Add vertical lines for Agent 2's communication in the previous timestep
+        for t in agent_2_data[agent_2_data['utterance'] != 'none']['timestep']:
+            plt.axvline(x=t + 1, color='black', linestyle='--', alpha=0.5, label='Agent 2 Communication' if t == agent_2_data[agent_2_data['utterance'] != 'none']['timestep'].iloc[0] else "")
 
-    # Adjust y-ticks to reflect the reward values
-    plt.yticks(list(value_map.values()), list(value_map.keys()))
+        # Adjust y-ticks to reflect the reward values
+        plt.yticks(list(value_map.values()), list(value_map.keys()))
 
-    plt.xlabel('Timestep')
-    plt.ylabel('Reward')
-    plt.title(f"Evolution of Reward Beliefs for Agent 1 in Task {problem_name}")
-    plt.legend()
-    plt.grid(True)
-    plt.tight_layout()
+        plt.xlabel('Timestep')
+        plt.ylabel('Reward')
+        plt.title(f"Evolution of Reward Beliefs for Agent 1 in Task {problem_name}")
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
 
-    # Ensure the output directory exists
-    output_dir = os.path.join(os.path.dirname(__file__), "../output/communication_vision/plots")
-    os.makedirs(output_dir, exist_ok=True)
-    
-    # Save the plot
-    plt.savefig(os.path.join(output_dir, f'{problem_name.replace("/", "-")}_belief_evolution.png'), dpi=300)
+        # Ensure the output directory exists
+        output_dir = os.path.join(os.path.dirname(__file__), "../output/communication_vision/plots")
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Save the plot
+        output_path = os.path.join(output_dir, f'{problem_name.replace("/", "-")}_belief_evolution_agent_{agent}.png')
+        print(f"Saving plot to {output_path}")
+        plt.savefig(output_path, dpi=300)
 
 # Example usage:
 plot_most_likely_gem_values('medium/1')
