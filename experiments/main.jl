@@ -73,7 +73,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]     
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_vision(
                 problem,
@@ -96,7 +96,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_no_communication_vision(
                 problem,
@@ -120,7 +120,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_restricted_vision(
                 problem,
@@ -143,7 +143,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_perfect_vision(
                 problem,
@@ -166,7 +166,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_gpt4o(
                 problem,
