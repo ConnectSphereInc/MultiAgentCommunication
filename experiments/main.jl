@@ -112,6 +112,7 @@ function main()
         end
     end
 
+
     # Run communication_restricted_vision
     task = "communication_restricted_vision"
     csv_filename = joinpath(@__DIR__, "output", task, "results.csv")

@@ -241,7 +241,7 @@ function run_simulation_no_communication_vision(
             end
 
             # Run particle filter and update beliefs
-            pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
+            pf_states[agent] = update_beliefs_no_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
             gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
