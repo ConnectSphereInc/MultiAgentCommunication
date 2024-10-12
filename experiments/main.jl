@@ -26,6 +26,26 @@ function init_csv(csv_filename)
     CSV.write(csv_filename, df)
 end
 
+function init_csv_gpt4o(csv_filename)
+    mkpath(dirname(csv_filename))
+    isfile(csv_filename) && rm(csv_filename)
+    df = DataFrame(
+        timestep = Int[],
+        agent = Int[],
+        score = Float64[],
+        gems_picked_up = Int[],
+        red = Float64[],
+        blue = Float64[],
+        green = Float64[],
+        yellow = Float64[],
+        pickup = String[],
+        utterance = String[],
+        problem_name = String[],
+        repeat = Int[]
+    )
+    CSV.write(csv_filename, df)
+end
+
 function main()
 
     overlay = DotEnv.config()
@@ -141,7 +161,7 @@ function main()
     # Run gpt4o
     task = "gpt4o"
     csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
-    init_csv(csv_filename)
+    init_csv_gpt4o(csv_filename)
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
