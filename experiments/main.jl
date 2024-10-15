@@ -59,10 +59,10 @@ function main()
 
     ############# Parameters #############
     ess_thresh = 0.3
-    num_particles = 100
+    num_particles = 300
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
-    T = 50
-    repeats = 1
+    T = 100
+    repeats = 5
     ######################################
 
 

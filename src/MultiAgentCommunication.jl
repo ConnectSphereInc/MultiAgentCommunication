@@ -14,6 +14,8 @@ include("heuristics.jl")
 include("inference.jl")
 
 export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o
+export agent_model_communication, agent_model_no_communication
+export update_beliefs_communication, update_beliefs_no_communication
 
 function run_simulation_communication_vision(
     problem_path::String,
@@ -641,7 +643,7 @@ function run_simulation_gpt4o(
                 current_utterances[agent] = utterance
                 gpt4o_context[agent] *= "\n self utterance = $utterance"
             else
-                gpt4o_context[agent] *= "\n gem pickup = false"
+                gpt4o_context[agent] *= "\n self gem pickup = false"
             end
 
             # Add other agents' utterances from the previous timestep to the observations
