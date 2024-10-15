@@ -7,18 +7,25 @@ import seaborn as sns
 file_path = os.path.join(os.path.dirname(__file__), "../output/communication_vision/results.csv")
 df = pd.read_csv(file_path)
 
+
 # Normalize the belief values to ensure they are between 0 and 1
 def normalize_beliefs(beliefs):
     beliefs_sum = [sum(row) for row in beliefs]
     normalized_beliefs = [[value / total if total != 0 else 0 for value in row] for row, total in zip(beliefs, beliefs_sum)]
     return normalized_beliefs
 
-def plot_heatmaps_for_agents_at_t_plus_1(df, problem_name, timestep):
+def plot_heatmaps_for_agents_at_t_plus_1(df, problem_name, timestep, repeat):
     
     next_timestep = timestep + 1
 
-    # Filter data for the specified problem and timestep + 1
-    filtered_df = df[(df['problem_name'] == problem_name) & (df['timestep'] == next_timestep)]
+    # Filter data for the specified problem, repeat, and timestep + 1
+    filtered_df = df[(df['problem_name'] == problem_name) & 
+                     (df['timestep'] == next_timestep) & 
+                     (df['repeat'] == repeat)]
+
+    if filtered_df.empty:
+        print(f"No data available for problem '{problem_name}', timestep '{next_timestep}', and repeat '{repeat}'")
+        return
 
     # Extract belief data for agent 1 and agent 2
     agent_1_data = filtered_df[filtered_df['agent'] == 1].iloc[0]
@@ -64,7 +71,7 @@ def plot_heatmaps_for_agents_at_t_plus_1(df, problem_name, timestep):
     plt.tight_layout()
 
     # Save the plot for agent 1
-    output_path_agent_1 = os.path.join(output_dir, f'{problem_name.replace("/", "-")}_heatmap_timestep_{next_timestep}_agent_1.png')
+    output_path_agent_1 = os.path.join(output_dir, f'{problem_name.replace("/", "-")}_heatmap_timestep_{next_timestep}_agent_1_repeat_{repeat}.png')
     print(f"Saving plot to {output_path_agent_1}")
     plt.savefig(output_path_agent_1, dpi=300)
     plt.close()
@@ -81,11 +88,11 @@ def plot_heatmaps_for_agents_at_t_plus_1(df, problem_name, timestep):
     plt.tight_layout()
 
     # Save the plot for agent 2
-    output_path_agent_2 = os.path.join(output_dir, f'{problem_name.replace("/", "-")}_heatmap_timestep_{next_timestep}_agent_2.png')
+    output_path_agent_2 = os.path.join(output_dir, f'{problem_name.replace("/", "-")}_heatmap_timestep_{next_timestep}_agent_2_repeat_{repeat}.png')
     print(f"Saving plot to {output_path_agent_2}")
     plt.savefig(output_path_agent_2, dpi=300)
     plt.close()
 
-# Example usage with t=8
-plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 6)
-plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 8)
+# Example usage with repeat=1
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 1, 1)
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 2, 1)

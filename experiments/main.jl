@@ -59,10 +59,10 @@ function main()
 
     ############# Parameters #############
     ess_thresh = 0.3
-    num_particles = 100
+    num_particles = 300
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
-    T = 50
-    repeats = 1
+    T = 100
+    repeats = 5
     ######################################
 
 
@@ -73,7 +73,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]     
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_vision(
                 problem,
@@ -96,7 +96,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_no_communication_vision(
                 problem,
@@ -112,6 +112,7 @@ function main()
         end
     end
 
+
     # Run communication_restricted_vision
     task = "communication_restricted_vision"
     csv_filename = joinpath(@__DIR__, "output", task, "results.csv")
@@ -119,7 +120,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_restricted_vision(
                 problem,
@@ -142,7 +143,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_communication_perfect_vision(
                 problem,
@@ -165,7 +166,7 @@ function main()
     for problem in problems
         for repeat in 1:repeats
             name = split(problem, "/")[end-1] * "/" * split(split(problem, "/")[end], ".")[1]
-            output_dir = joinpath(@__DIR__, "output", task, name)
+            output_dir = joinpath(@__DIR__, "output", task, name, string(repeat))
             mkpath(output_dir)
             results = run_simulation_gpt4o(
                 problem,

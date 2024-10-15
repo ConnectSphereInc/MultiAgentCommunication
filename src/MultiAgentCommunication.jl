@@ -14,6 +14,8 @@ include("heuristics.jl")
 include("inference.jl")
 
 export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o
+export agent_model_communication, agent_model_no_communication
+export update_beliefs_communication, update_beliefs_no_communication
 
 function run_simulation_communication_vision(
     problem_path::String,
@@ -241,7 +243,7 @@ function run_simulation_no_communication_vision(
             end
 
             # Run particle filter and update beliefs
-            pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
+            pf_states[agent] = update_beliefs_no_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
             gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
@@ -641,7 +643,7 @@ function run_simulation_gpt4o(
                 current_utterances[agent] = utterance
                 gpt4o_context[agent] *= "\n self utterance = $utterance"
             else
-                gpt4o_context[agent] *= "\n gem pickup = false"
+                gpt4o_context[agent] *= "\n self gem pickup = false"
             end
 
             # Add other agents' utterances from the previous timestep to the observations
