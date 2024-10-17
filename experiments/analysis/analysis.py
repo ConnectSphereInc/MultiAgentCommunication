@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import math
 
 # Define the directories that contain the result CSVs, including gpt4o
 output_folders = [
@@ -61,6 +62,8 @@ for folder in output_folders:
     correct_inferences = 0
     total_inferences = 0
     
+    last_pickup_times = []  # To store last pickup times
+    
     for _, group in grouped_data:
         for agent in group['agent'].unique():
             agent_data = group[group['agent'] == agent]
@@ -87,16 +90,30 @@ for folder in output_folders:
                 if inferred_beliefs[color] == ground_truth:
                     correct_inferences += 1
                 total_inferences += 1
+            
+            # Get the last pickup time for the agent (if any pickup was made)
+            if 'pickup' in agent_data.columns:
+                pickup_data = agent_data[agent_data['pickup'] != 'none']
+                if not pickup_data.empty:
+                    last_pickup_time = pickup_data['timestep'].max()
+                    last_pickup_times.append(last_pickup_time)
+    
+    # Calculate the average time the last gem was picked up
+    average_last_pickup_time = sum(last_pickup_times) / len(last_pickup_times) if last_pickup_times else 0
     
     # Calculate the percentage of correct inferences
-    percent_correct_inferences = (correct_inferences / total_inferences) * 100 if total_inferences > 0 else 0
+    accuracy = (correct_inferences / total_inferences) * 100 if total_inferences > 0 else 0
     
-    # Append the type (folder), average reward, uncertainty, and percentage correct inferences to the list
+    accuracy_variance = math.sqrt(accuracy * (100 - accuracy) / total_inferences)
+
+    # Append the type (folder), average reward, uncertainty, percentage correct inferences, and last pickup time to the list
     average_rewards_data.append({
         'type': folder,
         'average_reward': average_final_score,
         'std_error': std_error,
-        'percent_correct_inferences': percent_correct_inferences
+        'accuracy': accuracy,
+        'accuracy_variance': accuracy_variance,
+        'average_last_pickup_time': average_last_pickup_time
     })
 
 # Create a DataFrame from the collected data
@@ -106,4 +123,4 @@ average_rewards_df = pd.DataFrame(average_rewards_data)
 output_file_path = 'experiments/analysis/analysis.csv'
 average_rewards_df.to_csv(output_file_path, index=False)
 
-print("Average rewards with uncertainties and correctness have been saved to:", output_file_path)
+print("Average rewards with uncertainties, correctness, and last gem pickup times have been saved to:", output_file_path)

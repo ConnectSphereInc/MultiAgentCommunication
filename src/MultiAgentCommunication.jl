@@ -7,6 +7,7 @@ using Random
 using SymbolicPlanners: get_value, get_goal_terms
 using DotEnv
 using DataFrames
+using Distributions
 
 include("agent.jl")
 include("utils.jl")
@@ -93,23 +94,25 @@ function run_simulation_communication_vision(
             # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, utterance = "none", "none"
+            item, utterance, observed_reward = "none", "none", 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
-                reward = ground_truth_rewards[gem]
-                combined_score += reward
+                combined_score += ground_truth_rewards[gem]
+
+                # Generate noisy reward observation
+                observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
 
                 # Update the observations for pickup
                 observations[agent][(t => :self => :gem_pickup)] = true
                 observations[agent][(t => :self => :gem)] = gem
-                observations[agent][(t => :self => :reward_received)] = reward
+                observations[agent][(t => :self => :reward_received)] = observed_reward
 
                 # Generate utterance
-                utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                utterance_tr, _ = Gen.generate(utterance_model, (gem, observed_reward), Gen.choicemap())
                 utterance = Gen.get_retval(utterance_tr)
                 current_utterances[agent] = utterance
                 observations[agent][(t => :self => :utterance => :output)] = utterance
@@ -135,7 +138,7 @@ function run_simulation_communication_vision(
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
 
-            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance)
+            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
         end
         
         previous_utterances = current_utterances
@@ -226,20 +229,21 @@ function run_simulation_no_communication_vision(
             # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, utterance = "none", "none"
+            item, utterance, observed_reward = "none", "none", 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
-                reward = ground_truth_rewards[gem]
-                combined_score += reward
+                combined_score += ground_truth_rewards[gem]
+
+                observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
 
                 # Update the observations for pickup
                 observations[agent][(t => :self => :gem_pickup)] = true
                 observations[agent][(t => :self => :gem)] = gem
-                observations[agent][(t => :self => :reward_received)] = reward
+                observations[agent][(t => :self => :reward_received)] = observed_reward
             end
 
             # Run particle filter and update beliefs
@@ -248,7 +252,7 @@ function run_simulation_no_communication_vision(
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
 
-            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance)
+            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
         end
 
         t += 1
@@ -338,23 +342,25 @@ function run_simulation_communication_restricted_vision(
             # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, utterance = "none", "none"
+            item, utterance, observed_reward = "none", "none", 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
-                reward = ground_truth_rewards[gem]
-                combined_score += reward
+                combined_score += ground_truth_rewards[gem]
+
+                # Generate noisy reward observation
+                observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
 
                 # Update the observations for pickup
                 observations[agent][(t => :self => :gem_pickup)] = true
                 observations[agent][(t => :self => :gem)] = gem
-                observations[agent][(t => :self => :reward_received)] = reward
+                observations[agent][(t => :self => :reward_received)] = observed_reward
 
                 # Generate utterance
-                utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                utterance_tr, _ = Gen.generate(utterance_model, (gem, observed_reward), Gen.choicemap())
                 utterance = Gen.get_retval(utterance_tr)
                 current_utterances[agent] = utterance
                 observations[agent][(t => :self => :utterance => :output)] = utterance
@@ -380,7 +386,7 @@ function run_simulation_communication_restricted_vision(
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
 
-            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance)
+            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
         end
 
         previous_utterances = current_utterances
@@ -482,23 +488,25 @@ function run_simulation_communication_perfect_vision(
                 # Set observations
                 observations[agent] = Gen.choicemap()
                 observations[agent][(t => :self => :gem_pickup)] = false
-                item, utterance = "none", "none"
+                item, utterance, observed_reward = "none", "none", 0
                 if action.name == :pickup
                     item = action.args[2].name
                     remaining_items = filter(x -> x != item, remaining_items)
                     gem = parse_gem(String(item))
                     num_gems_picked_up[agent] += 1
                     total_gems_picked_up += 1
-                    reward = ground_truth_rewards[gem]
-                    combined_score += reward
+                    combined_score += ground_truth_rewards[gem]
+
+                    # Generate noisy reward observation
+                    observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
 
                     # Update the observations for pickup
                     observations[agent][(t => :self => :gem_pickup)] = true
                     observations[agent][(t => :self => :gem)] = gem
-                    observations[agent][(t => :self => :reward_received)] = reward
+                    observations[agent][(t => :self => :reward_received)] = observed_reward
 
                     # Generate utterance
-                    utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                    utterance_tr, _ = Gen.generate(utterance_model, (gem, observed_reward), Gen.choicemap())
                     utterance = Gen.get_retval(utterance_tr)
                     current_utterances[agent] = utterance
                     observations[agent][(t => :self => :utterance => :output)] = utterance
@@ -524,11 +532,11 @@ function run_simulation_communication_perfect_vision(
                 utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
                 beliefs[agent] = utilities
 
-                append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance)
+                append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
             else
                 @warn "No gems with non-negative reward found for $agent"
                 gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
-                append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, "none", "none")
+                append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, "none", "none", 0)
             end
 
         end
@@ -622,23 +630,26 @@ function run_simulation_gpt4o(
             # Clear previous observations and create new observation for this timestep
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, utterance = "none", "none"
+            item, utterance, observed_reward = "none", "none", 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
                 gem = parse_gem(String(item))
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
-                reward = ground_truth_rewards[gem]
-                combined_score += reward
+                combined_score += ground_truth_rewards[gem]
+
+                # Generate noisy reward observation
+                observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
+
 
                 # Update the observations for pickup
                 gpt4o_context[agent] *= "\n self gem pickup = true"
                 gpt4o_context[agent] *= "\n self gem type = $gem"
-                gpt4o_context[agent] *= "\n self gem reward = $reward"
+                gpt4o_context[agent] *= "\n self gem reward = $observed_reward"
 
                 # Generate utterance
-                utterance_tr, _ = Gen.generate(utterance_model, (gem, reward), Gen.choicemap())
+                utterance_tr, _ = Gen.generate(utterance_model, (gem, observed_reward), Gen.choicemap())
                 utterance = Gen.get_retval(utterance_tr)
                 current_utterances[agent] = utterance
                 gpt4o_context[agent] *= "\n self utterance = $utterance"
@@ -662,7 +673,7 @@ function run_simulation_gpt4o(
 
             beliefs[agent] = parse_belief(gpt4o(gpt4o_context[agent]))
 
-            append_to_results_gpt4o!(results, t, i, combined_score, total_gems_picked_up, beliefs[agent], string(item), utterance)
+            append_to_results_gpt4o!(results, t, i, combined_score, total_gems_picked_up, beliefs[agent], string(item), utterance, observed_reward)
         end
 
         previous_utterances = current_utterances

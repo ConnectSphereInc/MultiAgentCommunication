@@ -2,6 +2,7 @@ using DataStructures: OrderedDict
 using PDDLViz: RGBA, to_color, set_alpha
 using Logging
 using OpenAI
+using Distributions
 
 """
     Gets the (x, y) position of the specified agent.
@@ -280,7 +281,8 @@ function setup_results()
         green_m5 = Float64[], green_1 = Float64[], green_2 = Float64[], green_3 = Float64[],
         yellow_m5 = Float64[], yellow_1 = Float64[], yellow_2 = Float64[], yellow_3 = Float64[],
         pickup = String[],
-        utterance = String[]
+        utterance = String[],
+        observed_reward = Int[]
     )
 end
 
@@ -300,7 +302,8 @@ function setup_results_gpt4o()
         green = Float64[],
         yellow = Float64[],
         pickup = String[],
-        utterance = String[]
+        utterance = String[],
+        observed_reward = Int[]
     )
 end
 
@@ -309,7 +312,7 @@ end
     
     Appends a row to the results DataFrame.
 """
-function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_value_probs::Dict, item::String, utterance::String)
+function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_value_probs::Dict, item::String, utterance::String, observed_reward::Int)
     row = Dict(
         :timestep => t,
         :agent => i,
@@ -332,7 +335,8 @@ function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::
         :yellow_2 => gem_value_probs[:yellow][2],
         :yellow_3 => gem_value_probs[:yellow][3],
         :pickup => item,
-        :utterance => utterance
+        :utterance => utterance,
+        :observed_reward => observed_reward
     )
     push!(results, row)
 end
@@ -342,7 +346,7 @@ end
     
     Appends a row to the results DataFrame.
 """
-function append_to_results_gpt4o!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_values::Dict, item::String, utterance::String)
+function append_to_results_gpt4o!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_values::Dict, item::String, utterance::String, observed_reward::Int)
     row = Dict(
         :timestep => t,
         :agent => i,
@@ -353,7 +357,8 @@ function append_to_results_gpt4o!(results::DataFrame, t::Int, i::Int, combined_s
         :green => gem_values[:green],
         :yellow => gem_values[:yellow],
         :pickup => item,
-        :utterance => utterance
+        :utterance => utterance,
+        :observed_reward => observed_reward
     )
     push!(results, row)
 end
@@ -425,4 +430,21 @@ function get_on_grid_gems(domain::Domain, state::State)
         end
     end
     return on_grid_gems
+end
+
+"""
+    sample_noisy_reward(true_reward, possible_rewards)
+
+    Sample a noisy reward based on the true reward.
+"""
+function sample_noisy_reward(true_reward, possible_rewards)
+    num_rewards = length(possible_rewards)
+    correct_prob = 0.96  # High probability of observing the correct reward
+    error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
+    probs = fill(error_prob, num_rewards)
+    
+    correct_index = findfirst(r -> r == true_reward, possible_rewards)
+    probs[correct_index] = correct_prob
+    
+    return possible_rewards[rand(Categorical(probs))]
 end
