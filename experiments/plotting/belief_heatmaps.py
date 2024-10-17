@@ -94,4 +94,7 @@ def plot_heatmaps_for_agents_at_t_plus_1(df, problem_name, timestep, repeat):
     plt.close()
 
 # Example usage with repeat=1
-plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 7, 1)
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 6, 5)
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 8, 5)
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 9, 5)
+plot_heatmaps_for_agents_at_t_plus_1(df, 'medium/1', 99, 5)

@@ -93,7 +93,7 @@ def plot_combined_beliefs_and_probabilities(problem_name, repeat, plot_type='sca
         ax2.set_ylabel('Probability')
 
         # Set axis limits
-        ax.set_xlim(1, 50)
+        ax.set_xlim(1, 100)
         ax.set_ylim(-0.6, 3.5)
 
         ax.set_ylabel('Reward')
@@ -121,5 +121,4 @@ def plot_combined_beliefs_and_probabilities(problem_name, repeat, plot_type='sca
         plt.close()
 
 # Example usage:
-plot_combined_beliefs_and_probabilities('medium/1', 1, plot_type='scatter')
 plot_combined_beliefs_and_probabilities('medium/1', 1, plot_type='line')

@@ -20,8 +20,9 @@ function init_csv(csv_filename)
         yellow_m5 = Float64[], yellow_1 = Float64[], yellow_2 = Float64[], yellow_3 = Float64[],
         pickup = String[],
         utterance = String[],
+        observed_reward = Int[],
         problem_name = String[],
-        repeat = Int[]
+        repeat = Int[],
     )
     CSV.write(csv_filename, df)
 end
@@ -40,6 +41,7 @@ function init_csv_gpt4o(csv_filename)
         yellow = Float64[],
         pickup = String[],
         utterance = String[],
+        observed_reward = Int[],
         problem_name = String[],
         repeat = Int[]
     )
@@ -54,12 +56,12 @@ function main()
 
     problem_folder = joinpath(@__DIR__, "..", "src/problems/medium")
     files = readdir(problem_folder)
-    problems = [joinpath(problem_folder, file) for file in files]
+    problems = [joinpath(problem_folder, file) for file in files][1:1]
     
 
     ############# Parameters #############
     ess_thresh = 0.3
-    num_particles = 500
+    num_particles = 300
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
     T = 100
     repeats = 5

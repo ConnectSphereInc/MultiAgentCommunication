@@ -69,9 +69,9 @@ end
             error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
             probs = fill(error_prob, num_rewards)
 
-            @dist gem_observation() = possible_rewards[categorical(probs)]
             correct_index = findfirst(r -> r == rewards[gem], possible_rewards)
             probs[correct_index] = correct_prob
+            @dist gem_observation() = possible_rewards[categorical(probs)]
 
             reward = {t => :self => :reward_received} ~ gem_observation()
             {t => :self} ~ utterance_model(gem, reward)
@@ -117,9 +117,9 @@ end
             error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
             probs = fill(error_prob, num_rewards)
 
-            @dist gem_observation() = possible_rewards[categorical(probs)]
             correct_index = findfirst(r -> r == rewards[gem], possible_rewards)
             probs[correct_index] = correct_prob
+            @dist gem_observation() = possible_rewards[categorical(probs)]
 
             reward = {t => :self => :reward_received} ~ gem_observation()
         end
