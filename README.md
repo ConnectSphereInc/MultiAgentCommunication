@@ -20,7 +20,24 @@ OPENAI_API_KEY=<your-api-key>
 ```
 
 ## Usage
+The experiment can be run with: 
 
 ```bash
 JULIA_NUM_THREADS=<THREADS> julia --project=. experiments/main.jl
+```
+
+Figures can be generated with:
+
+```bash
+python experiment/plotting/belief_evolution.py
+```
+
+```bash
+python experiment/plotting/belief_heatmaps.py
+```
+
+Tables can be generated with:
+
+```bash
+python experiment/analysis/analysis.py
 ```
