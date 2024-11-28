@@ -21,12 +21,12 @@ export update_beliefs_communication, update_beliefs_no_communication, enum_infer
 function run_simulation_communication_vision(
     problem_path::String,
     output_folder::String,
-    ess_thresh::Float64,
-    num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
     gridworld_only::Bool = false,
-    inference_type::String = "enum"
+    inference_type::String = "enum",
+    ess_thresh::Union{Float64, Nothing} = nothing,
+    num_particles::Union{Int, Nothing} = nothing
 )
     results = setup_results()
 
@@ -62,6 +62,8 @@ function run_simulation_communication_vision(
         error("Invalid inference type")
     end
 
+
+    # Initiate beliefs optimistically -- each gem is worth 5
     beliefs = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
 
     # Initialize planners
@@ -75,7 +77,7 @@ function run_simulation_communication_vision(
     # Main simulation loop
     t = 1
     while !isempty(remaining_items) && t <= T
-        print(t)
+        println("T: ", t)
         current_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
         for (i, agent) in enumerate(agents)
 
@@ -166,6 +168,25 @@ function run_simulation_communication_vision(
 
     return results
 end
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 function run_simulation_no_communication_vision(
     problem_path::String,

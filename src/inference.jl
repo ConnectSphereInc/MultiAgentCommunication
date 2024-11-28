@@ -41,10 +41,19 @@ function update_beliefs_no_communication(pf_state, current_timestep, num_agents,
     return pf_state
 end
 
+
+
+
+
+
+
+
+
 function enum_inference(
     model::GenerativeFunction, model_args::Tuple,
     observations::ChoiceMap, latent_addrs, latent_values
 )
+    println("   Running enumerative inference")
     @assert length(latent_addrs) == length(latent_values)
     # Construct iterator over combinations of latent values
     latents_iter = Iterators.product(latent_values...)
@@ -58,7 +67,6 @@ function enum_inference(
         tr, _ = Gen.generate(model, model_args, constraints)
         return tr
     end
-    # Compute the log probability of each trace
     logprobs = map(Gen.get_score, traces)
     # Compute the log marginal likelihood of the observations
     lml = logsumexp(logprobs)
@@ -78,12 +86,13 @@ function enum_inference(
     )
 end
 
+
+
 function enum_inference_step(
     prev_results::NamedTuple, new_model_args::Tuple, new_observations::ChoiceMap
 )
     # Update previous traces with the new arguments and observations
     argdiffs = map(_ -> UnknownChange(), new_model_args)
-    println(display(argdiffs))
     traces = map(prev_results.traces) do prev_trace
         trace, _, _, _ =
             Gen.update(prev_trace, new_model_args, argdiffs, new_observations)
