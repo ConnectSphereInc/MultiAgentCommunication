@@ -14,9 +14,56 @@ include("utils.jl")
 include("heuristics.jl")
 include("inference.jl")
 
-export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o
+export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o, run_simulation_debug
 export agent_model_communication, agent_model_no_communication
 export update_beliefs_communication, update_beliefs_no_communication, enum_inference, enum_inference_step
+
+function run_simulation_debug()
+
+    results = setup_results()
+
+    ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
+
+    possible_gems = collect(keys(ground_truth_rewards))
+    possible_rewards = collect(values(ground_truth_rewards))
+
+    observations1 = Gen.choicemap()
+    observations1[(1 => :self => :gem_pickup)] = false
+
+    observations2 = Gen.choicemap()
+    observations2[(2 => :self => :gem_pickup)] = false
+
+    observations3 = Gen.choicemap()
+    observations3[(3 => :self => :gem_pickup)] = true
+    observations3[(3 => :self => :gem)] = :red
+    observations3[(3 => :self => :reward_received)] = 1
+
+    observations = [observations1, observations2, observations3]
+
+    enum_results = nothing
+    for (t, observation) in enumerate(observations)
+        println("Timestep: ", t)
+        if t == 1
+            enum_results = enum_inference(
+                agent_model_communication,
+                (t, 1, possible_gems, possible_rewards),
+                observation, 
+                ((:reward => :red), (:reward => :blue), (:reward => :green), (:reward => :yellow)),
+                (possible_rewards, possible_rewards, possible_rewards, possible_rewards))
+        else
+            enum_results = enum_inference_step(enum_results, (t, 1, possible_gems, possible_rewards), observation)
+        end
+        gem_reward_probs = get_gem_reward_probabilities(enum_results.latent_addrs, enum_results.latent_probs, possible_gems, possible_rewards)
+        append_to_results!(results, t, 1, 0, 0, gem_reward_probs, "NA", "NA", -1)
+        # println("Gem Reward Probs: ", gem_reward_probs)
+    end
+
+    return results
+end
+
+
+
+
 
 function run_simulation_communication_vision(
     problem_path::String,
@@ -74,6 +121,11 @@ function run_simulation_communication_vision(
     observations = Dict(agent => Gen.choicemap() for agent in agents)
     previous_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
 
+    # # Add the initial beliefs to the results for tracking and plotting
+    # for (i, agent) in enumerate(agents)
+    #     append_to_results!(results, 0, i, 0, 0, gem_reward_probs, string(item), utterance, observed_reward)
+    # end
+
     # Main simulation loop
     t = 1
     while !isempty(remaining_items) && t <= T
@@ -126,7 +178,6 @@ function run_simulation_communication_vision(
                 utterance_tr, _ = Gen.generate(utterance_model, (gem, observed_reward), Gen.choicemap())
                 utterance = Gen.get_retval(utterance_tr)
                 current_utterances[agent] = utterance
-                observations[agent][(t => :self => :utterance => :output)] = utterance
             end
 
             # Agent observes other agents' utterances from the previous timestep
@@ -146,12 +197,14 @@ function run_simulation_communication_vision(
             if inference_type == "pf"
                 pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
                 gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
-            elseif inference_type == "enum" && t == 1
-                enum_results[agent] = enum_inference(agent_model_communication, (t, length(agents), possible_gems, possible_rewards), observations[agent], ([(:reward, :red), (:reward, :blue), (:reward, :yellow), (:reward, :green)]), (possible_rewards,possible_rewards,possible_rewards,possible_rewards,))
-                gem_reward_probs = get_enum_gem_reward_probabilities(enum_results[agent], possible_gems, possible_rewards)
             elseif inference_type == "enum"
-                enum_results[agent] = enum_inference_step(enum_results[agent], (t, length(agents), possible_gems, possible_rewards), observations[agent])
-                gem_reward_probs = get_enum_gem_reward_probabilities(enum_results[agent], possible_gems, possible_rewards)
+                if t == 1
+                    enum_results[agent] = enum_inference(agent_model_communication, (t, length(agents), possible_gems, possible_rewards), observations[agent], (((:reward => :red), (:reward => :blue), (:reward => :green), (:reward => :yellow))), (possible_rewards,possible_rewards,possible_rewards,possible_rewards,))
+                else
+                    enum_results[agent] = enum_inference_step(enum_results[agent], (t, length(agents), possible_gems, possible_rewards), observations[agent])
+                end
+                gem_reward_probs = get_gem_reward_probabilities(enum_results[agent].latent_addrs, enum_results[agent].latent_probs, possible_gems, possible_rewards)
+                # println("Gem Reward Probs: ", gem_reward_probs)
             end
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities

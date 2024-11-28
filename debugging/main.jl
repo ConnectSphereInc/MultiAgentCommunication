@@ -40,7 +40,7 @@ function main()
 
     ############# Parameters #############
     # TODO: input these parameters with an argsparser
-    problem = joinpath(@__DIR__, "..", "src/problems/simple/1.pddl")
+    problem = joinpath(@__DIR__, "..", "src/problems/medium/1.pddl")
     output_dir = joinpath(@__DIR__, "output")
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
     T = 10
@@ -52,14 +52,16 @@ function main()
     csv_filename = joinpath(@__DIR__, output_dir, "results.csv")
     init_csv(csv_filename)
 
-    results = run_simulation_communication_vision(
-        problem,
-        output_dir,
-        ground_truth_rewards,
-        T,
-        gridworld_only,
-        inference_type
-    )
+    # results = run_simulation_communication_vision(
+    #     problem,
+    #     output_dir,
+    #     ground_truth_rewards,
+    #     T,
+    #     gridworld_only,
+    #     inference_type
+    # )
+
+    results = run_simulation_debug()
 
     CSV.write(csv_filename, results, append=true)
 

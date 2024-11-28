@@ -16,98 +16,104 @@ os.makedirs(output_dir, exist_ok=True)
 # Define grid layout
 grid_layout = (4, 4)
 
-# Normalize the belief values to ensure they are between 0 and 1
-def normalize_beliefs(beliefs):
-    beliefs_sum = [sum(row) for row in beliefs]
-    normalized_beliefs = [[value / total if total != 0 else 0 for value in row] for row, total in zip(beliefs, beliefs_sum)]
-    return normalized_beliefs
-
-# Function to create animated heatmaps with enhanced layout and text
-def create_heatmap_animation(agent_data, agent_id, other_agent_data, color_map="YlGnBu"):
-
-    fig, ax = plt.subplots(figsize=(8, 8))
+def create_dual_heatmap_animation(agent1_data, agent2_data, color_map="YlGnBu"):
+    # Create figure with two subplots side by side
+    fig = plt.figure(figsize=(16, 12))  # Increased overall figure height
     
-    # Adjust margins for a tighter layout
-    plt.subplots_adjust(left=0.3, right=0.7, bottom=0.3, top=0.9)
+    # Create a specific layout with gridspec
+    gs = plt.GridSpec(2, 2, height_ratios=[3, 1])  # 2x2 grid with more space for heatmaps
+    ax1 = fig.add_subplot(gs[0, 0])  # First heatmap
+    ax2 = fig.add_subplot(gs[0, 1])  # Second heatmap
+    text_ax = fig.add_subplot(gs[1, :])  # Full width for text
+    text_ax.axis('off')  # Hide the text axis
     
-    # Maximum timestep for filtering
-    max_timestep = agent_data['timestep'].max()
-    timestep_data = agent_data[agent_data['timestep'] <= max_timestep]
-
-    # Custom x-axis and y-axis labels based on reward values and gem colors
-    ax.set_xticks([0.5, 1.5, 2.5, 3.5])
-    ax.set_xticklabels(['-5', '1', '2', '3'], fontsize=12)
-    ax.set_yticks([0.5, 1.5, 2.5, 3.5])
-    ax.set_yticklabels(['Yellow', 'Green', 'Blue', 'Red'], fontsize=12)
+    # Adjust layout
+    plt.subplots_adjust(left=0.1, right=0.9, bottom=0.1, top=0.9, wspace=0.3, hspace=0.3)
     
-    # Static color bar for probability range
-    sns.heatmap(np.zeros(grid_layout), vmin=0, vmax=1, cbar=True, annot=True, fmt=".2f", 
-                cmap=color_map, square=True, ax=ax, cbar_kws={"shrink": 0.5})
-
-    # Update function to add probability values only, with structured agent texts
-    def update(row):
-        ax.clear()
-        
-        # Probability matrix aligned with gem colors (rows) and rewards (columns)
-        prob_matrix = np.array([
-            [row['yellow_m5'], row['yellow_1'], row['yellow_2'], row['yellow_3']],
-            [row['green_m5'], row['green_1'], row['green_2'], row['green_3']],
-            [row['blue_m5'], row['blue_1'], row['blue_2'], row['blue_3']],
-            [row['red_m5'], row['red_1'], row['red_2'], row['red_3']]
-        ])
-        
-        # Plot heatmap with probability values in the chosen color map
-        sns.heatmap(prob_matrix, vmin=0, vmax=1, annot=True, fmt=".2f", cmap=color_map, 
-                    cbar=False, square=True, ax=ax)
-        
-        # Set correct x-axis and y-axis labels
+    # Setup axes labels and ticks for both plots
+    for ax in [ax1, ax2]:
         ax.set_xticks([0.5, 1.5, 2.5, 3.5])
         ax.set_xticklabels(['-5', '1', '2', '3'], fontsize=12)
         ax.set_yticks([0.5, 1.5, 2.5, 3.5])
         ax.set_yticklabels(['Yellow', 'Green', 'Blue', 'Red'], fontsize=12)
-        
-        # Title and text structure for actions and utterances
-        ax.set_title(f"Agent {agent_id} - Timestep {int(row['timestep'])}", fontsize=14)
-        
-        # Self-agent details on the left
-        self_action = f"Self Agent Action: {row['pickup'].capitalize() if row['pickup'] != 'none' else 'No Pickup'}"
-        self_utterance = f"Self Agent Utterance: {row['utterance']}" if row['utterance'] != 'none' else "Self Agent Utterance: None"
-        
-        # # Other-agent details on the right (align by timestep)
-        # timestep = row['timestep']
-        # other_row = other_agent_data[other_agent_data['timestep'] == timestep].iloc[0]
-        # other_action = f"Other Agent Action: {other_row['pickup'].capitalize() if other_row['pickup'] != 'none' else 'No Pickup'}"
-        # other_utterance = f"Other Agent Utterance: {other_row['utterance']}" if other_row['utterance'] != 'none' else "Other Agent Utterance: None"
-        
-        # Display self-agent text on the left and other-agent text on the right, no bold
-        ax.text(0.5, -0.2, self_action, ha='center', va='center', transform=ax.transAxes, fontsize=12)
-        ax.text(0.5, -0.3, self_utterance, ha='center', va='center', transform=ax.transAxes, fontsize=12)
-        # ax.text(0.5, -0.4, other_action, ha='center', va='center', transform=ax.transAxes, fontsize=12,)
-        # ax.text(0.5, -0.5, other_utterance, ha='center', va='center', transform=ax.transAxes, fontsize=12)
     
-    # Create animation with frames spanning the timestep range
-    anim = FuncAnimation(fig, update, frames=[row for _, row in timestep_data.iterrows()], repeat=False)
-    filename = os.path.join(output_dir, f"agent_{agent_id}_heatmap_styled.gif")
+    # Initial heatmaps with zero matrices for colorbar setup
+    sns.heatmap(np.zeros(grid_layout), vmin=0, vmax=1, cbar=True, annot=True, fmt=".2f",
+                cmap=color_map, square=True, ax=ax1, cbar_kws={"shrink": 0.5})
+    sns.heatmap(np.zeros(grid_layout), vmin=0, vmax=1, cbar=True, annot=True, fmt=".2f",
+                cmap=color_map, square=True, ax=ax2, cbar_kws={"shrink": 0.5})
+
+    def update(frame):
+        timestep = frame
+        
+        # Clear axes
+        ax1.clear()
+        ax2.clear()
+        text_ax.clear()
+        text_ax.axis('off')
+        
+        # Get data for current timestep
+        agent1_row = agent1_data[agent1_data['timestep'] == timestep].iloc[0]
+        agent2_row = agent2_data[agent2_data['timestep'] == timestep].iloc[0]
+        
+        # Create probability matrices for both agents
+        def create_prob_matrix(row):
+            return np.array([
+                [row['yellow_m5'], row['yellow_1'], row['yellow_2'], row['yellow_3']],
+                [row['green_m5'], row['green_1'], row['green_2'], row['green_3']],
+                [row['blue_m5'], row['blue_1'], row['blue_2'], row['blue_3']],
+                [row['red_m5'], row['red_1'], row['red_2'], row['red_3']]
+            ])
+        
+        prob_matrix1 = create_prob_matrix(agent1_row)
+        prob_matrix2 = create_prob_matrix(agent2_row)
+        
+        # Plot heatmaps
+        sns.heatmap(prob_matrix1, vmin=0, vmax=1, annot=True, fmt=".2f", cmap=color_map,
+                    cbar=False, square=True, ax=ax1)
+        sns.heatmap(prob_matrix2, vmin=0, vmax=1, annot=True, fmt=".2f", cmap=color_map,
+                    cbar=False, square=True, ax=ax2)
+        
+        # Reset ticks and labels for both plots
+        for ax in [ax1, ax2]:
+            ax.set_xticks([0.5, 1.5, 2.5, 3.5])
+            ax.set_xticklabels(['-5', '1', '2', '3'], fontsize=12)
+            ax.set_yticks([0.5, 1.5, 2.5, 3.5])
+            ax.set_yticklabels(['Yellow', 'Green', 'Blue', 'Red'], fontsize=12)
+        
+        # Set titles
+        ax1.set_title(f"Agent {agent1_row['agent']} - Timestep {int(timestep)}", fontsize=14)
+        ax2.set_title(f"Agent {agent2_row['agent']} - Timestep {int(timestep)}", fontsize=14)
+        
+        # Format action and utterance text
+        def format_agent_text(row, agent_num):
+            action = f"Agent {agent_num} Action: {row['pickup'].capitalize() if row['pickup'] != 'none' else 'No Pickup'}"
+            utterance = f"Agent {agent_num} Utterance: {row['utterance']}" if row['utterance'] != 'none' else f"Agent {agent_num} Utterance: None"
+            return action, utterance
+        
+        # Get formatted text for both agents
+        agent1_action, agent1_utterance = format_agent_text(agent1_row, 1)
+        agent2_action, agent2_utterance = format_agent_text(agent2_row, 2)
+        
+        # Add text using the text axis
+        text = f"{agent1_action}\n{agent1_utterance}\n{agent2_action}\n{agent2_utterance}"
+        text_ax.text(0.5, 0.5, text, ha='center', va='center', fontsize=12, 
+                    transform=text_ax.transAxes, linespacing=2)
+
+    # Create animation
+    unique_timesteps = sorted(pd.concat([agent1_data['timestep'], agent2_data['timestep']]).unique())
+    anim = FuncAnimation(fig, update, frames=unique_timesteps, repeat=False)
+    
+    # Save animation
+    filename = os.path.join(output_dir, "dual_agent_heatmap.gif")
     anim.save(filename, writer=PillowWriter(fps=2))
     plt.close()
     return filename
 
-# Generate styled GIFs for each agent with full enhancements and save them
-file_paths_styled = []
+# Generate the dual agent animation
 agents = df['agent'].unique()
-for agent_id in agents:
-    # Define self and other agent data
-    agent_data = df[(df['agent'] == agent_id)]
-    if len(agents) != 1:
-        other_agent_id = agents[1] if agent_id == agents[0] else agents[0]
-        other_agent_data = df[(df['repeat'] == 1) & (df['agent'] == other_agent_id)]
-    else:
-        # Other agent data should be na
-        other_agent_data = None
+agent1_data = df[df['agent'] == agents[0]]
+agent2_data = df[df['agent'] == agents[1]]
 
-        
-    # Create GIF for current agent with full styling
-    file_path = create_heatmap_animation(agent_data, agent_id, other_agent_data, color_map="YlGnBu")
-    file_paths_styled.append(file_path)
-
-print("Generated GIFs:", file_paths_styled)
+file_path = create_dual_heatmap_animation(agent1_data, agent2_data, color_map="YlGnBu")
+print("Generated dual agent GIF:", file_path)

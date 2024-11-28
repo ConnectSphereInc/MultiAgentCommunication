@@ -65,7 +65,7 @@ end
 
             # Agent is likely to observe the correct reward
             num_rewards = length(possible_rewards)
-            correct_prob = 0.96  # High probability of observing the correct reward
+            correct_prob = 1  # High probability of observing the correct reward
             error_prob = (1 - correct_prob) / (num_rewards - 1)  # Distribute remaining probability among other rewards
             probs = fill(error_prob, num_rewards)
 
@@ -74,7 +74,6 @@ end
             @dist gem_observation() = possible_rewards[categorical(probs)]
 
             reward = {t => :self => :reward_received} ~ gem_observation()
-            {t => :self} ~ utterance_model(gem, reward)
         end
 
         # Agent observes utterances of the other agents (from the previous timestep)

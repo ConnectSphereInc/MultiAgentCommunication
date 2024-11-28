@@ -40,27 +40,26 @@ function get_gem_reward_probabilities(state::ParticleFilterState, possible_gems:
 end
 
 """
-    Computes the probability distribution over rewards for each gem based on the  results of enumerative inference.
+    Constructs the probability distribution over rewards for each gem
+    using precomputed latent addresses and probabilities.
 """
-function get_enum_gem_reward_probabilities(enum_results, possible_gems, possible_values)
-    traces = enum_results.traces
-    logprobs = enum_results.logprobs
-    total_prob = sum(exp.(logprobs))  # Sum of probabilities for normalization
-
+function get_gem_reward_probabilities(latent_addrs, latent_probs, possible_gems, possible_values)
     # Initialize dictionary to hold reward probabilities for each gem
     gem_value_counts = Dict(gem => Dict(value => 0.0 for value in possible_values) for gem in possible_gems)
-
-    # Accumulate weighted counts for each gem-reward pair
-    for (tr, logprob) in zip(traces, logprobs)
-        weight = exp(logprob) / total_prob  # Normalized weight for this trace
-        for gem in possible_gems
-            reward = tr[:reward => gem]
-            gem_value_counts[gem][reward] += weight
+    # Directly assign probabilities to gem-reward pairs
+    for addr in latent_addrs
+        if addr in keys(latent_probs)
+            gem = addr[2]  # Extract gem (e.g., :red, :blue, etc.)
+            probs = latent_probs[addr]
+            if gem in possible_gems && length(probs) == length(possible_values)
+                gem_value_counts[gem] = Dict(value => prob for (value, prob) in zip(possible_values, probs))
+            end
         end
     end
 
     return gem_value_counts
 end
+
 
 """
     Get the reawrd of each gem as the most likely value, or if uncertain, assign a random positive reward to encourate exploration.
