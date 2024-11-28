@@ -17,5 +17,5 @@
         (= (xloc robot1) 2)
         (= (yloc robot1) 4)
     )
-    (:goal (and (has robot1 red_gem1) (has robot1 blue_gem2)))
+    (:goal (has robot1 red_gem1))
 )

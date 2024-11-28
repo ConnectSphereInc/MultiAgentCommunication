@@ -17,6 +17,7 @@ include("inference.jl")
 export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o, run_simulation_debug
 export agent_model_communication, agent_model_no_communication
 export update_beliefs_communication, update_beliefs_no_communication, enum_inference, enum_inference_step
+export utterance_model, construct_prompt
 
 function run_simulation_debug()
 
@@ -55,7 +56,6 @@ function run_simulation_debug()
         end
         gem_reward_probs = get_gem_reward_probabilities(enum_results.latent_addrs, enum_results.latent_probs, possible_gems, possible_rewards)
         append_to_results!(results, t, 1, 0, 0, gem_reward_probs, "NA", "NA", -1)
-        # println("Gem Reward Probs: ", gem_reward_probs)
     end
 
     return results
@@ -120,11 +120,7 @@ function run_simulation_communication_vision(
     # Initialize observations
     observations = Dict(agent => Gen.choicemap() for agent in agents)
     previous_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
-
-    # # Add the initial beliefs to the results for tracking and plotting
-    # for (i, agent) in enumerate(agents)
-    #     append_to_results!(results, 0, i, 0, 0, gem_reward_probs, string(item), utterance, observed_reward)
-    # end
+    last_gem_picked_up = Dict{Symbol, Union{Nothing, Symbol}}(agent => nothing for agent in agents)
 
     # Main simulation loop
     t = 1
@@ -157,7 +153,7 @@ function run_simulation_communication_vision(
             # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, utterance, observed_reward = "none", "none", 0
+            item, gem, utterance, observed_reward = "none", nothing, "none", 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
@@ -165,6 +161,7 @@ function run_simulation_communication_vision(
                 num_gems_picked_up[agent] += 1
                 total_gems_picked_up += 1
                 combined_score += ground_truth_rewards[gem]
+                last_gem_picked_up[agent] = gem
 
                 # Generate noisy reward observation
                 observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
@@ -186,6 +183,7 @@ function run_simulation_communication_vision(
                 if other_agent != agent
                     if previous_utterances[other_agent] !== nothing
                         observations[agent][(t => :other_agents => other_agent_index => :spoke)] = true
+                        # observations[agent][(t => :other_agents => other_agent_index => :gem)] = last_gem_picked_up[other_agent]
                         observations[agent][(t => :other_agents => other_agent_index => :utterance => :output)] = previous_utterances[other_agent]
                     else
                         observations[agent][(t => :other_agents => other_agent_index => :spoke)] = false
