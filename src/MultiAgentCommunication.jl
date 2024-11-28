@@ -16,7 +16,7 @@ include("inference.jl")
 
 export run_simulation_communication_vision, run_simulation_no_communication_vision, run_simulation_communication_restricted_vision, run_simulation_communication_perfect_vision, run_simulation_gpt4o
 export agent_model_communication, agent_model_no_communication
-export update_beliefs_communication, update_beliefs_no_communication
+export update_beliefs_communication, update_beliefs_no_communication, enum_inference, enum_inference_step
 
 function run_simulation_communication_vision(
     problem_path::String,
@@ -25,7 +25,8 @@ function run_simulation_communication_vision(
     num_particles::Int,
     ground_truth_rewards::Dict{Symbol, Int},
     T::Int,
-    gridworld_only::Bool = false
+    gridworld_only::Bool = false,
+    inference_type::String = "enum"
 )
     results = setup_results()
 
@@ -53,7 +54,14 @@ function run_simulation_communication_vision(
     state = initial_state
 
     # Initialize beliefs
-    pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
+    if inference_type == "pf"
+        pf_states = Dict{Symbol, Union{Nothing, ParticleFilterState{Gen.DynamicDSLTrace}}}(agent => nothing for agent in agents)
+    elseif inference_type == "enum"
+        enum_results = Dict{Symbol, Union{Nothing, NamedTuple}}(agent => nothing for agent in agents)
+    else
+        error("Invalid inference type")
+    end
+
     beliefs = Dict(agent => Dict(gem => 5.0 for gem in [:red, :blue, :yellow, :green]) for agent in agents)
 
     # Initialize planners
@@ -67,6 +75,7 @@ function run_simulation_communication_vision(
     # Main simulation loop
     t = 1
     while !isempty(remaining_items) && t <= T
+        print(t)
         current_utterances = Dict{Symbol, Union{Nothing, String}}(agent => nothing for agent in agents)
         for (i, agent) in enumerate(agents)
 
@@ -132,12 +141,18 @@ function run_simulation_communication_vision(
                 end
             end
 
-            # Run particle filter and update beliefs
-            pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
-            gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
+            if inference_type == "pf"
+                pf_states[agent] = update_beliefs_communication(pf_states[agent], t, length(agents), possible_gems, possible_rewards, observations[agent], num_particles, ess_thresh)
+                gem_reward_probs = get_gem_reward_probabilities(pf_states[agent], possible_gems, possible_rewards)
+            elseif inference_type == "enum" && t == 1
+                enum_results[agent] = enum_inference(agent_model_communication, (t, length(agents), possible_gems, possible_rewards), observations[agent], ([(:reward, :red), (:reward, :blue), (:reward, :yellow), (:reward, :green)]), (possible_rewards,possible_rewards,possible_rewards,possible_rewards,))
+                gem_reward_probs = get_enum_gem_reward_probabilities(enum_results[agent], possible_gems, possible_rewards)
+            elseif inference_type == "enum"
+                enum_results[agent] = enum_inference_step(enum_results[agent], (t, length(agents), possible_gems, possible_rewards), observations[agent])
+                gem_reward_probs = get_enum_gem_reward_probabilities(enum_results[agent], possible_gems, possible_rewards)
+            end
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
-
             append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
         end
         
