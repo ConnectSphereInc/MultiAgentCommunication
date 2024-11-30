@@ -44,7 +44,7 @@ function debug_simulation()
     problem = joinpath(@__DIR__, "..", "src/problems/simple/2.pddl")
     output_dir = joinpath(@__DIR__, "output")
     ground_truth_rewards = Dict(:red => 1, :blue => -5, :yellow => 3, :green => 2)
-    T = 100
+    T = 6
     gridworld_only = false
     inference_type = "enum"
     ######################################

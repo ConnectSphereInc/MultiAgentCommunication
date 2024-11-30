@@ -87,26 +87,84 @@ function enum_inference(
 end
 
 
+
 function enum_inference_step(
     prev_results::NamedTuple, new_model_args::Tuple, new_observations::ChoiceMap
 )
-    # Update previous traces with the new arguments and observations
-    argdiffs = map(_ -> UnknownChange(), new_model_args)
-    traces = map(prev_results.traces) do prev_trace
-        trace, _, _, _ =
-            Gen.update(prev_trace, new_model_args, argdiffs, new_observations)
-        return trace
+    t = new_model_args[1]
+    num_agents = new_model_args[2]
+    possible_gems = new_model_args[3]
+    possible_rewards = new_model_args[4]
+
+    # Check if any agent spoke
+    any_spoke = false
+    speaking_agent = nothing
+    for i in 1:num_agents-1
+        if Gen.has_value(new_observations, (t => :other_agents => i => :spoke)) &&
+            new_observations[t => :other_agents => i => :spoke]
+            any_spoke = true
+            speaking_agent = i
+            break
+        end
     end
-    # Compute the log probability of each trace
+
+    argdiffs = map(_ -> UnknownChange(), new_model_args)
+
+    if !any_spoke
+        # If no agent spoke, just update each trace
+        traces = map(prev_results.traces) do prev_trace
+            trace, _, _, _ = Gen.update(prev_trace, new_model_args, argdiffs, new_observations)
+            return trace
+        end
+    else
+        # If agent spoke, generate all possibilities
+        traces = []
+        for prev_trace in prev_results.traces
+            for gem in possible_gems
+                # Create a new choicemap instead of copying
+                new_obs = new_observations
+                new_obs[(t => :other_agents => speaking_agent => :gem)] = gem                
+                trace, _, _, _ = Gen.update(prev_trace, new_model_args, argdiffs, new_obs)
+                push!(traces, trace)
+            end
+        end
+    end
+
+    # Get logprobs for all traces
     logprobs = map(Gen.get_score, traces)
-    # Compute the log marginal likelihood of the observations
     lml = logsumexp(logprobs)
-    # Compute the (marginal) posterior probabilities for each latent variable
-    latent_logprobs = Dict(
-        addr => ([logsumexp(lps) for lps in eachslice(logprobs, dims=i)] .- lml)
-        for (i, addr) in enumerate(prev_results.latent_addrs)
-    )
-    latent_probs = Dict(addr => exp.(lp) for (addr, lp) in latent_logprobs)
+
+    # For each latent address (reward for each gem color)...
+    latent_logprobs = Dict()
+    latent_probs = Dict()
+    
+    for addr in prev_results.latent_addrs
+        # Group traces by their reward value for this address
+        reward_groups = Dict{Int, Vector{Float64}}()
+        
+        # For each trace and its logprob...
+        for (trace, lp) in zip(traces, logprobs)
+            reward = trace[addr]  # Get reward value for this gem color
+            if !haskey(reward_groups, reward)
+                reward_groups[reward] = Float64[]
+            end
+            push!(reward_groups[reward], lp)
+        end
+        
+        # Calculate marginal probability for each possible reward value
+        addr_logprobs = map(possible_rewards) do r
+            if haskey(reward_groups, r)
+                # Sum (in log space) over all traces with this reward value
+                logsumexp(reward_groups[r]) - lml
+            else
+                -Inf  # If we never saw this reward value
+            end
+        end
+        
+        latent_logprobs[addr] = addr_logprobs
+        latent_probs[addr] = exp.(addr_logprobs)
+    end
+
     return (
         traces = traces,
         logprobs = logprobs,
