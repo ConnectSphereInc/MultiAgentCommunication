@@ -304,7 +304,8 @@ function setup_results()
         yellow_m5 = Float64[], yellow_1 = Float64[], yellow_2 = Float64[], yellow_3 = Float64[],
         pickup = String[],
         utterance = String[],
-        observed_reward = Int[]
+        observed_reward = Int[],
+        ground_truth_reward = Int[]
     )
 end
 
@@ -325,7 +326,8 @@ function setup_results_gpt4o()
         yellow = Float64[],
         pickup = String[],
         utterance = String[],
-        observed_reward = Int[]
+        observed_reward = Int[],
+        ground_truth_reward = Int[]
     )
 end
 
@@ -334,7 +336,7 @@ end
     
     Appends a row to the results DataFrame.
 """
-function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_value_probs::Dict, item::String, utterance::String, observed_reward::Int)
+function append_to_results!(;results::DataFrame, t::Int, i::Int, combined_score::Int, total_gems_picked_up::Int, gem_value_probs::Dict, item::String, utterance::String, observed_reward::Int, ground_truth_reward::Int)
     row = Dict(
         :timestep => t,
         :agent => i,
@@ -358,7 +360,8 @@ function append_to_results!(results::DataFrame, t::Int, i::Int, combined_score::
         :yellow_3 => gem_value_probs[:yellow][3],
         :pickup => item,
         :utterance => utterance,
-        :observed_reward => observed_reward
+        :observed_reward => observed_reward,
+        :ground_truth_reward => ground_truth_reward
     )
     push!(results, row)
 end

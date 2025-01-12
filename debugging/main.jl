@@ -26,6 +26,7 @@ function init_csv(csv_filename)
         pickup = String[],
         utterance = String[],
         observed_reward = Int[],
+        ground_truth_reward = Int[],
         problem_name = String[],
         repeat = Int[],
     )

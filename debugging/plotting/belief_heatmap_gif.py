@@ -88,15 +88,16 @@ def create_dual_heatmap_animation(agent1_data, agent2_data, color_map="YlGnBu"):
         # Format action and utterance text
         def format_agent_text(row, agent_num):
             action = f"Agent {agent_num} Action: {row['pickup'].capitalize() if row['pickup'] != 'none' else 'No Pickup'}"
+            reward = f"Agent {agent_num} Observed Reward: {row['observed_reward']} | Ground Truth Reward: {row['ground_truth_reward']}"
             utterance = f"Agent {agent_num} Utterance: {row['utterance']}" if row['utterance'] != 'none' else f"Agent {agent_num} Utterance: None"
-            return action, utterance
+            return action, reward, utterance
         
         # Get formatted text for both agents
-        agent1_action, agent1_utterance = format_agent_text(agent1_row, 1)
-        agent2_action, agent2_utterance = format_agent_text(agent2_row, 2)
+        agent1_action, agent1_observed_reward, agent1_utterance = format_agent_text(agent1_row, 1)
+        agent2_action, agent2_observed_reward, agent2_utterance = format_agent_text(agent2_row, 2)
         
         # Add text using the text axis
-        text = f"{agent1_action}\n{agent1_utterance}\n{agent2_action}\n{agent2_utterance}"
+        text = f"{agent1_action}\n{agent1_observed_reward}\n{agent1_utterance}\n{agent2_observed_reward}\n{agent2_action}\n{agent2_utterance}"
         text_ax.text(0.5, 0.5, text, ha='center', va='center', fontsize=12, 
                     transform=text_ax.transAxes, linespacing=2)
 

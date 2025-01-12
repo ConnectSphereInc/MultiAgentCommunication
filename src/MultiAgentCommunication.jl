@@ -153,7 +153,7 @@ function run_simulation_communication_vision(
             # Set observations
             observations[agent] = Gen.choicemap()
             observations[agent][(t => :self => :gem_pickup)] = false
-            item, gem, utterance, observed_reward = "none", nothing, "none", 0
+            item, gem, utterance, observed_reward, ground_truth_reward = "none", nothing, "none", 0, 0
             if action.name == :pickup
                 item = action.args[2].name
                 remaining_items = filter(x -> x != item, remaining_items)
@@ -164,6 +164,7 @@ function run_simulation_communication_vision(
                 last_gem_picked_up[agent] = gem
 
                 # Generate noisy reward observation
+                ground_truth_reward = ground_truth_rewards[gem]
                 observed_reward = sample_noisy_reward(ground_truth_rewards[gem], possible_rewards)
 
                 # Update the observations for pickup
@@ -202,11 +203,21 @@ function run_simulation_communication_vision(
                     enum_results[agent] = enum_inference_step(enum_results[agent], (t, length(agents), possible_gems, possible_rewards), observations[agent])
                 end
                 gem_reward_probs = get_gem_reward_probabilities(enum_results[agent].latent_addrs, enum_results[agent].latent_probs, possible_gems, possible_rewards)
-                # println("Gem Reward Probs: ", gem_reward_probs)
             end
             utilities = calculate_gem_utility(gem_reward_probs, possible_rewards)
             beliefs[agent] = utilities
-            append_to_results!(results, t, i, combined_score, total_gems_picked_up, gem_reward_probs, string(item), utterance, observed_reward)
+            append_to_results!(
+                results=results,
+                t=t, 
+                i=i,
+                combined_score=combined_score,
+                total_gems_picked_up=total_gems_picked_up, 
+                gem_value_probs=gem_reward_probs, 
+                item=string(item), 
+                utterance=utterance, 
+                observed_reward=observed_reward,
+                ground_truth_reward=ground_truth_reward
+                )
         end
         
         previous_utterances = current_utterances
@@ -219,6 +230,8 @@ function run_simulation_communication_vision(
 
     return results
 end
+
+
 
 
 
@@ -284,7 +297,7 @@ function run_simulation_no_communication_vision(
     planners = [RTHS(heuristic, n_iters=0, max_nodes=5) for heuristic in heuristics]
 
     # Initialize observations
-    observations = Dict(agent => Gen.choicemap() for agent in agents)
+    observations = Dict(aågent => Gen.choicemap() for agent in agents)
 
     # Main simulation loop
     t = 1
